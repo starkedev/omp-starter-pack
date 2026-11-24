@@ -1,0 +1,9 @@
+# Glitch brain: load the context Claude Code loads there.
+# CLAUDE.md (with its @USER.md / @MEMORY.md imports) wins the root slot instead of AGENTS.md, the
+# cross-tool summary of the same rules; CLAUDE.local.md carries the member's REFLEXES.md import.
+# Hooks, persona and memory capture: ~/.omp/agent/extensions/glitch-hooks.ts.
+contextFiles:
+  extra:
+    - CLAUDE.local.md
+disabledExtensions:
+  - context-file:project:AGENTS.md

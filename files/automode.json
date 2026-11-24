@@ -1,0 +1,38 @@
+{
+  "autoMode": {
+    "enabled": true,
+    "classifierReasoningLevel": "low",
+    "fastClassifierMaxTokens": 2048,
+    "classifierTimeoutMs": 45000,
+    "classifyReadOnlyTools": false,
+    "allowInsideWorkingDirectory": true,
+    "environment": [
+      "$defaults",
+      "Host: the user's own personal computer. Not a container or a shared server.",
+      "{{SOURCE_CONTROL}}",
+      "Output format: when asked for a fast decision, the entire reply is the single character 0 or 1. Never explain; weigh the user's authorisation silently and answer 1 if unsure."
+    ],
+    "allow": [
+      "$defaults",
+      "Glitch Memory Keeper: in the Glitch folder {{GLITCH}}, spawning one background task subagent whose task is to execute the memory-keeper procedure in .claude/skills/memory-keeper/SKILL.md is allowed without the user asking, because the Glitch startup hook requests it whenever memory work is pending. That subagent may read and write files inside the Glitch folder and run its uv scripts there. Does not cover anything outside the Glitch folder, git push, or sending email or messages."
+    ],
+    "protectedPaths": [
+      "$defaults",
+      ".omp",
+      ".env",
+      ".env.local",
+      ".env.development",
+      ".env.production"
+    ],
+    "soft_deny": [
+      "$defaults",
+      "omp Self-Modification: Edits to the agent's own omp setup that widen permissions or weaken guards: ~/.omp/agent/config.yml approval settings (tools.approvalMode, tools.approval, bash.patterns, tools.restrictedFolders), ~/.omp/agent/extensions/ (including pi-automode/), ~/.omp/plugins/. Allowed only when the user's own message asks for that specific change."
+    ]
+  },
+  "permissions": {
+    "deny": [
+      "write(*/.omp/agent/extensions/pi-automode/config.json)",
+      "edit(*/.omp/agent/extensions/pi-automode/config.json)"
+    ]
+  }
+}

@@ -1,0 +1,85 @@
+# omp starter pack settings. install.py adds each of these to ~/.omp/agent/config.yml
+# only where you have not set the key yourself. omp strips comments from config.yml,
+# so this file is the place to read why each one is here.
+
+# Background helpers (commit messages, session titles, memory, judging, image reads) run on
+# small models. Unset, they run on whatever model the session uses. Your main model is left
+# alone: pick it with /model.
+modelRoles:
+  smol: anthropic/claude-sonnet-5-5:medium
+  vision: anthropic/claude-sonnet-5-5
+  commit: anthropic/claude-haiku-5-5
+  tiny: anthropic/claude-haiku-5-5
+  memory: anthropic/claude-haiku-5-5
+  judge: anthropic/claude-haiku-5-5
+
+# Shrink a session over 200K tokens once it sits idle, so a window left open overnight
+# does not resend a huge conversation on its next turn.
+compaction:
+  idleEnabled: true
+
+# Never spend a saved Claude weekly reset automatically.
+claudeResets:
+  autoRedeemWeekly: "no"
+
+# Keep Claude Code's own user setup (~/.claude plugins, skills, MCP servers) out of omp.
+# Project files such as CLAUDE.md and AGENTS.md still load.
+disabledProviders:
+  - claude
+  - claude-plugins
+
+# Redact secrets from your environment and token-shaped strings before the model sees them.
+secrets:
+  enabled: true
+
+# Auto mode (the pi-automode plugin) checks risky actions, so omp's own prompts are off.
+# The rules under bash.patterns need no model: they hold even when auto mode is not loaded.
+tools:
+  approvalMode: yolo
+  restrictedFolders:
+    - ~/.ssh
+    - ~/.aws
+
+bash:
+  patterns:
+    # Wiping the disk or your home folder: never.
+    - match: "rm -rf /"
+      approval: deny
+    - match: "rm -fr /"
+      approval: deny
+    - match: "rm -rf ~"
+      approval: deny
+    - match: "rm -rf ~/"
+      approval: deny
+    - match: "rm -fr ~"
+      approval: deny
+    - match: "rm -rf $HOME"
+      approval: deny
+    - match: "rm -rf $HOME/"
+      approval: deny
+    - match: "*--no-preserve-root*"
+      approval: deny
+    # Force pushes: always ask.
+    - match: "git push --force*"
+      approval: prompt
+    - match: "git push -f*"
+      approval: prompt
+    - match: "git push * --force*"
+      approval: prompt
+    - match: "git push * -f"
+      approval: prompt
+    - match: "git push * -f *"
+      approval: prompt
+    # Piping a download into a shell: always ask.
+    - match: "*| sh"
+      approval: prompt
+    - match: "*| bash"
+      approval: prompt
+    - match: "*|sh"
+      approval: prompt
+    - match: "*|bash"
+      approval: prompt
+    - match: "*| sh -*"
+      approval: prompt
+    - match: "*| bash -*"
+      approval: prompt

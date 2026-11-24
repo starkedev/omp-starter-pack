@@ -130,12 +130,42 @@ def save_copy(file: Path) -> None:
     print(f"  saved a copy of what you had: {backup}")
 
 
-def install_settings(choices: dict[str, object], helpers: str | None) -> None:
+def sign_in_models(order: list[str]) -> dict:
+    """Settings for the sign-ins in fallback order: the first one's helper models, and a fallback
+    chain from each model to the same kind of model on the sign-ins after it."""
+    sign_ins = load_yaml(PACK / "sign-ins.yml")
+    first = sign_ins[order[0]]
+    settings: dict = {"modelRoles": dict(first["helpers"])}
+    if len(order) < 2:
+        return settings
+    chains: dict[str, list[str]] = {}
+
+    def chain(key: str, targets: list[str]) -> None:
+        if key in chains:  # one model serving two roles takes the first role's chain
+            return
+        targets = [t for i, t in enumerate(targets) if t != key and t not in targets[:i]]
+        if targets:
+            chains[key] = targets
+
+    for role, model in first["helpers"].items():
+        chain(model, [sign_ins[name]["helpers"][role] for name in order[1:]])
+    # Main models: an exact key per sign-in, plus the provider's wildcard for a model picked with
+    # /model. Exact keys win over the wildcard, so the helpers above keep their own chains.
+    for i, name in enumerate(order):
+        later = [sign_ins[other]["main"] for other in order[i + 1:]] + [sign_ins[other]["main"] for other in order[:i]]
+        main = sign_ins[name]["main"]
+        chain(main, later)
+        chain(main.split("/")[0] + "/*", later)
+    settings["retry"] = {"rateLimitWalksChain": True, "fallbackChains": chains}
+    return settings
+
+
+def install_settings(choices: dict[str, object], sign_ins: list[str]) -> None:
     config = load_yaml(CONFIG)
     chosen = apply_choices(config, choices)
     pack = load_yaml(PACK / "settings.yml")
-    if helpers:
-        pack["modelRoles"] = load_yaml(PACK / "helper-roles.yml")[helpers]
+    if sign_ins:
+        pack.update(sign_in_models(sign_ins))
     added, kept = add_missing(config, pack)
     kept = [name for name in kept if name not in choices]
     if added or chosen:
@@ -310,7 +340,7 @@ def main() -> int:
     parser.add_argument("--glitch", type=Path, help="your Glitch folder (found by itself when you run this inside it)")
     parser.add_argument("--github", action="append", default=[], metavar="NAME", help="a GitHub account or organisation that is yours (repeatable)")
     parser.add_argument("--set", action="append", default=[], metavar="KEY=VALUE", dest="choices", help="a setting you chose, e.g. compaction.idleThresholdTokens=150000 (repeatable)")
-    parser.add_argument("--helpers", choices=sorted(load_yaml(PACK / "helper-roles.yml")), help="give omp's background helpers small models from the sign-in you use")
+    parser.add_argument("--sign-in", action="append", default=[], dest="sign_ins", metavar="NAME", choices=list(load_yaml(PACK / "sign-ins.yml")), help="a sign-in you use in omp; repeat in the order to fall back through them, first is used for the helpers")
     parser.add_argument("--check", action="store_true", help="check an install and change nothing")
     args = parser.parse_args()
 
@@ -325,7 +355,7 @@ def main() -> int:
             print("omp is not installed, or not on your PATH. Install it first, then run this again.")
             return 2
         print("Settings")
-        install_settings(parse_choices(args.choices), args.helpers)
+        install_settings(parse_choices(args.choices), args.sign_ins)
         print("Auto mode")
         install_extensions(glitch)
         install_plugin(omp)

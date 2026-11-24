@@ -62,6 +62,12 @@ body { background: var(--paper); }
 .choice b { display: block; font-weight: 640; }
 .choice span { color: var(--quiet); font-size: .92rem; }
 .choice .rec { color: var(--brand); font-weight: 600; font-size: .85rem; margin-left: .35rem; }
+.order { list-style: none; padding: 0; margin: 1.2rem 0 .6rem; display: grid; gap: .55rem; max-width: 38rem; }
+.order .choice { grid-template-columns: 1.2rem 1fr auto; align-items: center; }
+.order .choice input { margin: 0; }
+.order .pos { color: var(--brand); font-weight: 700; margin-right: .4rem; }
+.order .moves { display: flex; gap: .3rem; }
+.order .moves button { min-width: 2.2rem; padding: .25rem .5rem; }
 .field { display: grid; gap: .35rem; margin: 1.2rem 0; max-width: 38rem; }
 .field input[type=text] { font-family: var(--mono); font-size: .95rem; }
 .field small { color: var(--quiet); }
@@ -115,10 +121,11 @@ const { useEffect } = htmPreact;
 const REPO = "https://github.com/starkedev/omp-starter-pack";
 
 const SIGNINS = {
-  claude: { label: "Claude", helpers: "claude", note: "Claude Pro or Max, signed in inside omp." },
-  codex: { label: "ChatGPT (Codex)", helpers: "codex", note: "A ChatGPT plan, signed in inside omp." },
-  mistral: { label: "Mistral", helpers: "mistral", note: "A Mistral sign-in inside omp." },
-  other: { label: "Something else", helpers: null, note: "An API key or another provider. Background helpers then run on your main model." },
+  claude: { label: "Claude", note: "Claude Pro or Max.", idle: "claude" },
+  codex: { label: "ChatGPT (Codex)", note: "A ChatGPT plan.", idle: "never" },
+  cursor: { label: "Cursor", note: "A Cursor plan.", idle: "other" },
+  grok: { label: "Grok", note: "An xAI (Grok) account.", idle: "other" },
+  mistral: { label: "Mistral", note: "A Mistral plan.", idle: "other" },
 };
 const IDLE = {
   "200000": { label: "Over 200K tokens", note: "Recommended.", set: "--set compaction.idleEnabled=true --set compaction.idleThresholdTokens=200000", words: "shrink it when it is over 200K tokens" },
@@ -132,7 +139,7 @@ const WORKING = {
   none: { label: "Only near the model's limit", note: "omp's default: up to a million tokens on the large models.", set: "--set compaction.thresholdTokens=-1", words: "no working limit (omp's default)" },
 };
 
-const STEPS = ["Before you start", "Your sign-in", "Your Glitch folder", "Your GitHub", "Idle conversations", "While you work", "Hand it to Claude"];
+const STEPS = ["Before you start", "Your sign-ins", "Your Glitch folder", "Your GitHub", "Idle conversations", "While you work", "Hand it to Claude"];
 
 function shq(s) {
   if (/^[\w@%+=:,./~-]+$/.test(s)) return s;
@@ -146,8 +153,12 @@ function buildPrompt(a) {
   lines.push("Set me up with the omp starter pack. Follow AGENTS.md in this folder.");
   lines.push("");
   lines.push("I went through the walkthrough (start.html). My answers:");
-  const sign = a.signin ? `${SIGNINS[a.signin].label}${SIGNINS[a.signin].helpers ? ` (--helpers ${SIGNINS[a.signin].helpers})` : " (no helper set)"}` : null;
-  lines.push(["- Sign-in I use in omp: ", sign, "signin"]);
+  let sign = null;
+  if (a.signins.length) sign = a.signins.map(k => SIGNINS[k].label).join(", then ")
+    + (a.signins.length > 1 ? ", in that order" : "")
+    + ` (${a.signins.map(k => "--sign-in " + k).join(" ")})` + (a.other ? "; I also use another provider" : "");
+  else if (a.other) sign = "another provider, none of the listed ones (no --sign-in)";
+  lines.push(["- Sign-ins I use in omp: ", sign, "signin"]);
   const glitch = a.noGlitch ? "I don't have one yet; skip the Glitch parts" : (a.glitch.trim() || null);
   lines.push(["- My Glitch folder: ", glitch, "glitch"]);
   let gh = null;
@@ -170,7 +181,7 @@ function installCommand(a) {
   const parts = ["uv run install.py"];
   if (!a.noGlitch && a.glitch.trim()) parts.push("--glitch " + shq(a.glitch.trim()));
   if (a.ghMode === "list") names(a.gh).forEach(n => parts.push("--github " + shq(n)));
-  if (a.signin && SIGNINS[a.signin].helpers) parts.push("--helpers " + SIGNINS[a.signin].helpers);
+  a.signins.forEach(k => parts.push("--sign-in " + k));
   if (a.idle) parts.push(IDLE[a.idle].set);
   if (a.working) parts.push(WORKING[a.working].set);
   return parts.join(" ");
@@ -212,14 +223,22 @@ function Slip({ answers, lastChanged }) {
 function App() {
   const [step, setStep] = useState(0);
   const [seen, setSeen] = useState(0);
-  const [a, setA] = useState({ signin: null, glitch: "", noGlitch: false, ghMode: "find", gh: "", idle: "200000", working: "325000" });
+  const [a, setA] = useState({ signins: [], other: false, glitch: "", noGlitch: false, ghMode: "find", gh: "", idle: "200000", working: "325000" });
   const [lastChanged, setLastChanged] = useState(null);
   const top = useRef(null);
   const set = (key, slot) => value => { setA(prev => ({ ...prev, [key]: value })); setLastChanged(slot); };
   const go = n => { setStep(n); setSeen(s => Math.max(s, n)); top.current && top.current.scrollIntoView({ block: "start" }); };
   useEffect(() => { const h = top.current && top.current.querySelector("h2"); h && h.focus(); }, [step]);
 
-  const done = [true, !!a.signin, a.noGlitch || !!a.glitch.trim(), a.ghMode !== "list" || names(a.gh).length > 0, !!a.idle, !!a.working, false];
+  const toggleSignin = k => set("signins", "signin")(a.signins.includes(k) ? a.signins.filter(x => x !== k) : [...a.signins, k]);
+  const moveSignin = (k, by) => {
+    const list = [...a.signins]; const i = list.indexOf(k); const j = i + by;
+    if (j < 0 || j >= list.length) return;
+    [list[i], list[j]] = [list[j], list[i]];
+    set("signins", "signin")(list);
+  };
+  const firstIdle = a.signins.length ? SIGNINS[a.signins[0]].idle : "other";
+  const done = [true, a.signins.length > 0 || a.other, a.noGlitch || !!a.glitch.trim(), a.ghMode !== "list" || names(a.gh).length > 0, !!a.idle, !!a.working, false];
   const canNext = done[step];
 
   let body;
@@ -232,6 +251,7 @@ function App() {
       <li>Auto mode blocks less, and you know when it isn't on<span>Fewer "response was not 0 or 1" blocks, and a warning if it fails to load after an update.</span></li>
       <li>Long sessions cost less<span>A conversation is shrunk once it gets big or sits idle, and Glitch saves it to memory first.</span></li>
       <li>Background helpers run on small models<span>Titles, commit messages and image reads stop spending your main model's usage.</span></li>
+      <li>A limit on one sign-in doesn't stop you<span>Signed in to more than one? When one hits a rate or usage limit, omp carries on with the next.</span></li>
     </ul>
     <p class="why">You need these on your computer first:</p>
     <ul class="need">
@@ -240,12 +260,23 @@ function App() {
       <li><b>Claude Code</b><span>Runs the setup for you. omp works for this too.</span></li>
     </ul>`;
   if (step === 1) body = html`
-    <h2 tabindex="-1">Which sign-in do you use in omp?</h2>
-    <p class="why">This picks the small models for omp's background helpers. They have to come from a provider you are signed in to.</p>
-    <div class="choices">
-      ${Object.entries(SIGNINS).map(([v, s]) => html`<${Choice} name="signin" value=${v} current=${a.signin} onPick=${set("signin", "signin")} title=${s.label} note=${s.note} />`)}
-    </div>
-    <p class="why">Not signed in yet? Open omp, type <kbd>/login</kbd>, and check it answers a "hello" before you go on.</p>`;
+    <h2 tabindex="-1">Which sign-ins do you use in omp?</h2>
+    <p class="why">Tick each one you're signed in to, then put them in order. The first one's small models run omp's background helpers. When a model hits a rate or usage limit, omp moves to the next sign-in down the list, and back once the limit resets.</p>
+    <ol class="order">
+      ${[...a.signins, ...Object.keys(SIGNINS).filter(k => !a.signins.includes(k))].map(k => {
+        const s = SIGNINS[k]; const pos = a.signins.indexOf(k);
+        return html`<li key=${k}><label class="choice">
+          <input type="checkbox" checked=${pos >= 0} onChange=${() => toggleSignin(k)} />
+          <div><b>${pos >= 0 ? html`<span class="pos">${pos + 1}</span>` : null}${s.label}${pos === 0 ? html`<span class="rec">helpers</span>` : null}</b><span>${s.note}</span></div>
+          ${pos >= 0 && a.signins.length > 1 ? html`<div class="moves">
+            <button type="button" class="outline small" aria-label=${"Move " + s.label + " up"} disabled=${pos === 0} onClick=${e => { e.preventDefault(); moveSignin(k, -1); }}>↑</button>
+            <button type="button" class="outline small" aria-label=${"Move " + s.label + " down"} disabled=${pos === a.signins.length - 1} onClick=${e => { e.preventDefault(); moveSignin(k, 1); }}>↓</button>
+          </div>` : null}
+        </label></li>`;
+      })}
+    </ol>
+    <label class="check"><input type="checkbox" checked=${a.other} onChange=${e => set("other", "signin")(e.target.checked)} /> I also use something else (an API key or another provider)</label>
+    <p class="why">Not signed in yet? Open omp, type <kbd>/login</kbd>, and check it answers a "hello" before you go on. Only tick sign-ins that work.</p>`;
   if (step === 2) body = html`
     <h2 tabindex="-1">Where is your Glitch folder?</h2>
     <p class="why">The folder you open Claude Code in to talk to Glitch. It holds <code>.claude/hooks/write-guard.py</code>; Claude checks that before installing.</p>
@@ -270,9 +301,11 @@ function App() {
   if (step === 4) body = html`
     <h2 tabindex="-1">When should an idle conversation be shrunk?</h2>
     <p class="lede">omp resends the whole conversation on every turn, so a long one left open is costly to come back to. With this on, one over the limit that you leave alone is shrunk to a summary plus its latest messages. Glitch saves the chat to memory first.</p>
-    <p class="why">${a.signin === "codex"
+    <p class="why">${firstIdle === "never"
       ? "On a ChatGPT sign-in this never happens: its saved copy of the conversation doesn't expire. The next question is the one that counts for you."
-      : "On a Claude sign-in it happens a little under an hour after your last message, just before Claude's saved copy of the conversation expires."}</p>
+      : firstIdle === "claude"
+        ? "On a Claude sign-in it happens a little under an hour after your last message, just before Claude's saved copy of the conversation expires."
+        : "It happens once the conversation has sat idle for a while, up to an hour."}</p>
     <div class="choices">
       ${Object.entries(IDLE).map(([v, o]) => html`<${Choice} name="idle" value=${v} current=${a.idle} onPick=${set("idle", "idle")} title=${o.label} note=${o.note.replace("Recommended.", "The middle ground.")} rec=${v === "200000"} />`)}
     </div>`;

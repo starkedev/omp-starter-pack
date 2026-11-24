@@ -20,10 +20,12 @@ command, run it, and read its output back.
 
 - **omp**: `omp --version`. If it is missing, point them to
   <https://github.com/can1357/oh-my-pi#install> and stop until it is installed.
-- **Sign-in**: ask which sign-in they use in omp: Claude, ChatGPT (Codex), Mistral, or
-  something else. Then ask them to open omp, type "hello", and tell you whether it answered.
-  If it did not, they sign in inside omp first. The answer picks the helper models:
-  `--helpers claude`, `--helpers codex`, `--helpers mistral`, or nothing for anything else.
+- **Sign-ins**: ask which sign-ins they use in omp: Claude, ChatGPT (Codex), Cursor, Grok,
+  Mistral, or something else. Then ask them to open omp, type "hello", and tell you whether it
+  answered. If it did not, they sign in inside omp first. With more than one, ask which to use
+  first: the first one's small models run the background helpers, and when one hits a rate or
+  usage limit, omp moves to the next in that order. Add one `--sign-in` for each, in that
+  order: `claude`, `codex`, `cursor`, `grok`, `mistral`. Leave out "something else".
 - **Glitch folder**: ask where it is. It is the folder holding `.claude/hooks/write-guard.py`;
   check that file exists before going on. No Glitch folder is fine: the installer then skips
   the Glitch parts.
@@ -69,16 +71,16 @@ model whose own limit is smaller than this number, omp ignores it and uses its d
 
 Those are the only two settings to ask about. Do not ask about the main model: they pick it in
 omp with `/model`. Do not ask about auto mode's own rules: the pack's are the starting point.
-If they later change sign-in, they run the installer again with the other `--helpers` and
-`--set modelRoles.<role>=<model>` for each role already set, since it never replaces a
-setting by itself.
+If they later change sign-ins, they run the installer again with the new `--sign-in` list and
+`--set` for each `modelRoles.<role>` or `retry.fallbackChains` entry already set, since it
+never replaces a setting by itself.
 
 ## 3. Install
 
 Run from this folder, with one `--github` for each name (none if they have no GitHub):
 
 ```sh
-uv run install.py --glitch <Glitch folder> --github <name> --helpers <sign-in> <the --set parts from the tables>
+uv run install.py --glitch <Glitch folder> --github <name> --sign-in <first> --sign-in <next> <the --set parts from the tables>
 ```
 
 Read the output back in plain words: what was added, what was left as they had it, and what

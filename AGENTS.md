@@ -39,8 +39,11 @@ command, run it, and read its output back.
 **1. When should an idle conversation be shrunk?**
 
 omp resends the whole conversation on every turn, so a long one left open is costly to come
-back to. With this on, a conversation over the limit is shrunk to a summary plus its most
-recent messages after sitting idle for five minutes. Glitch saves the chat to memory first.
+back to. With this on, a conversation over the limit that is left alone is shrunk to a summary
+plus its most recent messages. With a Claude sign-in that happens a little under an hour after
+the last message, just before the provider's saved copy of the conversation expires. With a
+ChatGPT (Codex) sign-in it does not happen at all, because that saved copy never expires; the
+working limit below is what counts there. Glitch saves the chat to memory first.
 
 | Answer | Add to the command |
 |---|---|

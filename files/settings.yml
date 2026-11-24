@@ -22,12 +22,6 @@ compaction:
 claudeResets:
   autoRedeemWeekly: "no"
 
-# Keep Claude Code's own user setup (~/.claude plugins, skills, MCP servers) out of omp.
-# Project files such as CLAUDE.md and AGENTS.md still load.
-disabledProviders:
-  - claude
-  - claude-plugins
-
 # Redact secrets from your environment and token-shaped strings before the model sees them.
 secrets:
   enabled: true

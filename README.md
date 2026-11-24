@@ -18,7 +18,6 @@ Glitch's engine.
 | A session left open keeps growing, and every turn resends all of it. | Turns on idle compaction: a session over 200K tokens is shrunk once it sits idle. |
 | Background helpers (titles, commit messages, memory) run on your most expensive model. | Gives those helpers Haiku and Sonnet. Your main model is yours to pick with `/model`. |
 | omp can spend a saved Claude weekly reset by itself. | Turns that off. |
-| Your Claude Code plugins, skills and MCP servers load into omp too. | Keeps Claude Code's user setup out of omp. Project files such as `CLAUDE.md` still load. |
 | If auto mode is down, nothing stops a disastrous command. | Adds fixed rules that need no model: disk and home wipes are refused, force pushes and piping a download into a shell always ask, and `~/.ssh` and `~/.aws` are off limits. |
 
 `files/settings.yml` and `files/automode.json` hold the settings themselves, with the reason

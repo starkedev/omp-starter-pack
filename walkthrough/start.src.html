@@ -159,7 +159,7 @@ function buildPrompt(a) {
     + ` (${a.signins.map(k => "--sign-in " + k).join(" ")})` + (a.other ? "; I also use another provider" : "");
   else if (a.other) sign = "another provider, none of the listed ones (no --sign-in)";
   lines.push(["- Sign-ins I use in omp: ", sign, "signin"]);
-  const glitch = a.noGlitch ? "I don't have one yet; skip the Glitch parts" : (a.glitch.trim() || null);
+  const glitch = a.glitch.trim() || null;
   lines.push(["- My Glitch folder: ", glitch, "glitch"]);
   let gh = null;
   if (a.ghMode === "none") gh = "none, I don't use GitHub";
@@ -179,7 +179,7 @@ function promptText(lines) {
 
 function installCommand(a) {
   const parts = ["uv run install.py"];
-  if (!a.noGlitch && a.glitch.trim()) parts.push("--glitch " + shq(a.glitch.trim()));
+  if (a.glitch.trim()) parts.push("--glitch " + shq(a.glitch.trim()));
   if (a.ghMode === "list") names(a.gh).forEach(n => parts.push("--github " + shq(n)));
   a.signins.forEach(k => parts.push("--sign-in " + k));
   if (a.idle) parts.push(IDLE[a.idle].set);
@@ -223,7 +223,7 @@ function Slip({ answers, lastChanged }) {
 function App() {
   const [step, setStep] = useState(0);
   const [seen, setSeen] = useState(0);
-  const [a, setA] = useState({ signins: [], other: false, glitch: "", noGlitch: false, ghMode: "find", gh: "", idle: "200000", working: "325000" });
+  const [a, setA] = useState({ signins: [], other: false, glitch: "", ghMode: "find", gh: "", idle: "200000", working: "325000" });
   const [lastChanged, setLastChanged] = useState(null);
   const top = useRef(null);
   const set = (key, slot) => value => { setA(prev => ({ ...prev, [key]: value })); setLastChanged(slot); };
@@ -238,7 +238,7 @@ function App() {
     set("signins", "signin")(list);
   };
   const firstIdle = a.signins.length ? SIGNINS[a.signins[0]].idle : "other";
-  const done = [true, a.signins.length > 0 || a.other, a.noGlitch || !!a.glitch.trim(), a.ghMode !== "list" || names(a.gh).length > 0, !!a.idle, !!a.working, false];
+  const done = [true, a.signins.length > 0 || a.other, !!a.glitch.trim(), a.ghMode !== "list" || names(a.gh).length > 0, !!a.idle, !!a.working, false];
   const canNext = done[step];
 
   let body;
@@ -282,10 +282,9 @@ function App() {
     <p class="why">The folder you open Claude Code in to talk to Glitch. It holds <code>.claude/hooks/write-guard.py</code>; Claude checks that before installing.</p>
     <div class="field">
       <label for="glitch">Folder path</label>
-      <input id="glitch" type="text" placeholder="~/glitch" value=${a.glitch} disabled=${a.noGlitch} onInput=${e => set("glitch", "glitch")(e.target.value)} />
+      <input id="glitch" type="text" placeholder="~/glitch" value=${a.glitch} onInput=${e => set("glitch", "glitch")(e.target.value)} />
       <small>On a Mac, drag the folder into a terminal window to see its path.</small>
-    </div>
-    <label class="check"><input type="checkbox" checked=${a.noGlitch} onChange=${e => set("noGlitch", "glitch")(e.target.checked)} /> I don't have Glitch set up yet</label>`;
+    </div>`;
   if (step === 3) body = html`
     <h2 tabindex="-1">Which GitHub accounts are yours?</h2>
     <p class="why">Auto mode treats a push to these as a push to your own space. A push anywhere else gets a closer look. Leave out anything you're unsure of; not Glitch's own repo.</p>

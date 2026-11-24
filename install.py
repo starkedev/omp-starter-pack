@@ -147,15 +147,17 @@ def sign_in_models(order: list[str]) -> dict:
         if targets:
             chains[key] = targets
 
-    for role, model in first["helpers"].items():
-        chain(model, [sign_ins[name]["helpers"][role] for name in order[1:]])
-    # Main models: an exact key per sign-in, plus the provider's wildcard for a model picked with
-    # /model. Exact keys win over the wildcard, so the helpers above keep their own chains.
+    # Main models first: an exact key per sign-in, plus the provider's wildcard for a model picked
+    # with /model. Where a sign-in's main model also runs its helpers (Codex), the main chain wins:
+    # a limit on the model you work with should land on the next main model, not a helper.
     for i, name in enumerate(order):
         later = [sign_ins[other]["main"] for other in order[i + 1:]] + [sign_ins[other]["main"] for other in order[:i]]
         main = sign_ins[name]["main"]
         chain(main, later)
         chain(main.split("/")[0] + "/*", later)
+    # Helpers: exact keys beat the wildcard, so each falls to the same kind of helper.
+    for role, model in first["helpers"].items():
+        chain(model, [sign_ins[name]["helpers"][role] for name in order[1:]])
     settings["retry"] = {"rateLimitWalksChain": True, "fallbackChains": chains}
     return settings
 

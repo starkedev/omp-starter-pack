@@ -1,8 +1,8 @@
 /**
  * automode-check — warns when a session starts without the pi-automode plugin.
  *
- * The starter pack turns omp's own approval prompts off because auto mode checks risky
- * actions instead. If the plugin fails to load (an update, a broken install), nothing
+ * omp's default approval mode asks about nothing: the starter pack relies on auto mode to
+ * check risky actions. If the plugin fails to load (an update, a broken install), nothing
  * checks anything and omp gives no sign of it. This says so on the first prompt.
  *
  * Plugin tools may not be registered yet at session_start, so the check runs at

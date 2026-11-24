@@ -15,13 +15,14 @@ Glitch's engine.
 | Auto mode can fail to load after an update, and omp gives no sign. Nothing is then checked. | Installs a warning that appears on your first prompt when auto mode is missing. |
 | Auto mode ignores a config in the wrong place and runs on its defaults. | Writes the config where the plugin reads it under omp: `~/.omp/agent/extensions/pi-automode/config.json`. |
 | Auto mode blocks ordinary actions with "response was not 0 or 1" or a timeout. | Sets a 45 second timeout and tells the checking model to answer with one character. This reduces the blocks; a full fix is waiting upstream ([pi-automode#86](https://github.com/czottmann/pi-automode/pull/86)). |
-| A session left open keeps growing, and every turn resends all of it. | Turns on idle compaction: a session over 200K tokens is shrunk once it sits idle. |
-| Background helpers (titles, commit messages, memory) run on your most expensive model. | Gives those helpers Haiku and Sonnet. Your main model is yours to pick with `/model`. |
+| A session left open keeps growing, and every turn resends all of it. | Turns on idle compaction: a session over 200K tokens is shrunk once it sits idle. The guided setup also offers a limit for sessions you keep working in. |
+| Background helpers (titles, commit messages, memory, image reads) run on your most expensive model. | Gives those helpers Haiku and Sonnet. Your main model is yours to pick with `/model`. |
 | omp can spend a saved Claude weekly reset by itself. | Turns that off. |
-| If auto mode is down, nothing stops a disastrous command. | Adds fixed rules that need no model: disk and home wipes are refused, and `~/.ssh` and `~/.aws` are off limits. |
+| Secrets in your environment can end up in what the model reads. | Turns on omp's redaction of environment secrets and token-shaped strings. |
+| If auto mode is down, nothing stops a disastrous command. | Adds fixed rules that need no model: the plainest forms of a disk or home wipe are refused, and omp's file tools ask before touching `~/.ssh` and `~/.aws`. These are a last line, not a net: a differently spelled command gets past them. |
 
-`files/settings.yml` and `files/automode.json` hold the settings themselves, with the reason
-beside each one.
+`files/settings.yml` holds the settings with the reason beside each one; `files/automode.json`
+holds auto mode's rules.
 
 ## Install
 
@@ -43,15 +44,16 @@ installer for you. `AGENTS.md` is the script it follows.
 
 3. Restart omp.
 
-The installer never overwrites a setting you already have or an auto mode config that already
-exists. It adds what is missing, says what it left alone, and saves a copy of your settings
-first. To choose a value yourself, add `--set`, for example
+The installer never overwrites a setting you already have. It adds what is missing (for the
+fixed rules, it adds the pack's beside yours), says what it left alone, and saves a copy of a
+file before changing it. In an auto mode config that already exists it touches only two lines:
+your GitHub names and your Glitch folder. To choose a value yourself, add `--set`, for example
 `--set compaction.idleThresholdTokens=150000`.
 
 ## After every omp or plugin update
 
 ```sh
-uv run /path/to/omp-starter-pack/install.py --check
+uv run /path/to/omp-starter-pack/install.py --check --glitch /path/to/your/glitch
 ```
 
 It changes nothing. Every line should say `ok`. Updates are when things break quietly: a renamed
@@ -73,8 +75,24 @@ setting, a plugin that did not finish installing.
   mode checks reads (`classifyReadOnlyTools`), but lets reads inside the working folder through
   without a model call (`allowInsideWorkingDirectory`), so ordinary work costs nothing extra.
 
+## Known gaps
+
+- **omp's `eval` tool is not covered by Glitch's guards.** It runs Python or JavaScript
+  directly, and Glitch's hooks only know shell commands and file edits. Auto mode still
+  checks it.
+- **Auto mode's working-folder shortcut looks loose.** From reading its code, a read or write
+  whose path is a web or `ssh://` address counts as inside the working folder and skips the
+  check. Not yet confirmed in a live session.
+- **Chat transcripts are kept outside your Glitch folder**, in
+  `~/.omp/agent/glitch/transcripts/`, so Glitch's memory can read them. Nothing prunes them.
+
 ## Remove it
 
-Delete `~/.omp/agent/extensions/glitch-hooks.ts`, `~/.omp/agent/extensions/automode-check.ts`
-and the `.omp` folder in your Glitch folder. Run `omp plugin uninstall @czottmann/pi-automode`.
-Put back the settings copy the installer saved beside `~/.omp/agent/config.yml`.
+1. Run `omp plugin uninstall @czottmann/pi-automode`.
+2. Delete `~/.omp/agent/extensions/glitch-hooks.ts`, `~/.omp/agent/extensions/automode-check.ts`
+   and the folder `~/.omp/agent/extensions/pi-automode`.
+3. Delete the `.omp` folder in your Glitch folder, and the `.omp/` line in its
+   `.git/info/exclude`.
+4. Delete `~/.omp/agent/glitch/transcripts/` if you do not want the transcripts.
+5. Put back the settings copy the installer saved beside `~/.omp/agent/config.yml`, or delete
+   the settings you no longer want from that file.

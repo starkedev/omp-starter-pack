@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["pyyaml>=6"]
+# dependencies = ["ruamel.yaml>=0.18"]
 # ///
 """omp starter pack for Glitch: install it, or check an install.
 
@@ -22,7 +22,7 @@ import sys
 import time
 from pathlib import Path
 
-import yaml
+from ruamel.yaml import YAML
 
 PACK = Path(__file__).resolve().parent / "files"
 OMP_HOME = Path.home() / ".omp"
@@ -33,6 +33,8 @@ AUTOMODE_CONFIG = EXTENSIONS / "pi-automode" / "config.json"
 AUTOMODE_PACKAGE = OMP_HOME / "plugins" / "node_modules" / "@czottmann" / "pi-automode" / "package.json"
 PLUGIN = "@czottmann/pi-automode"
 GLITCH_MARKER = Path(".claude") / "hooks" / "write-guard.py"
+SOURCE_PREFIX = "Source control: the user's own GitHub accounts"
+KEEPER_PREFIX = "Glitch Memory Keeper:"
 
 
 def find_glitch(start: Path) -> Path | None:
@@ -42,29 +44,56 @@ def find_glitch(start: Path) -> Path | None:
     return None
 
 
+def yaml_io() -> YAML:
+    """YAML 1.2, as omp reads it: a bare `no` or `off` is text, not False."""
+    yaml = YAML(typ="safe", pure=True)
+    yaml.default_flow_style = False
+    yaml.sort_base_mapping_type_on_output = False
+    return yaml
+
+
 def load_yaml(file: Path) -> dict:
     if not file.exists():
         return {}
-    data = yaml.safe_load(file.read_text(encoding="utf-8"))
+    data = yaml_io().load(file.read_text(encoding="utf-8"))
     return data if isinstance(data, dict) else {}
 
 
 def add_missing(target: dict, source: dict, prefix: str = "") -> tuple[list[str], list[str]]:
-    """Copies keys target lacks from source. Returns (added, kept) setting names."""
+    """Copies what target lacks from source: missing keys, and missing items of a list both have.
+
+    Returns (added, kept) setting names.
+    """
     added: list[str] = []
     kept: list[str] = []
     for key, value in source.items():
         name = f"{prefix}{key}"
-        if key not in target:
+        if target.get(key) is None:
             target[key] = value
             added.append(name)
         elif isinstance(value, dict) and isinstance(target[key], dict):
             more_added, more_kept = add_missing(target[key], value, f"{name}.")
             added += more_added
             kept += more_kept
+        elif isinstance(value, list) and isinstance(target[key], list):
+            # Lists here are safety rules: yours stay, and the pack's go in ahead of them.
+            missing = [item for item in value if item not in target[key]]
+            if missing:
+                target[key][:0] = missing
+                added.append(f"{name} ({len(missing)} more)")
         elif target[key] != value:
             kept.append(name)
     return added, kept
+
+
+def parse_value(text: str) -> object:
+    """true/false and whole numbers become those; anything else stays text ("no" is not False)."""
+    if text in ("true", "false"):
+        return text == "true"
+    try:
+        return int(text)
+    except ValueError:
+        return text
 
 
 def parse_choices(pairs: list[str]) -> dict[str, object]:
@@ -73,7 +102,7 @@ def parse_choices(pairs: list[str]) -> dict[str, object]:
         key, sep, value = pair.partition("=")
         if not sep or not key:
             raise SystemExit(f"--set needs KEY=VALUE, got: {pair}")
-        choices[key] = yaml.safe_load(value)
+        choices[key] = parse_value(value)
     return choices
 
 
@@ -95,6 +124,12 @@ def apply_choices(config: dict, choices: dict[str, object]) -> list[str]:
     return changed
 
 
+def save_copy(file: Path) -> None:
+    backup = file.with_name(f"{file.name}.before-starter-pack-{time.strftime('%Y%m%d-%H%M%S')}")
+    shutil.copy2(file, backup)
+    print(f"  saved a copy of what you had: {backup}")
+
+
 def install_settings(choices: dict[str, object]) -> None:
     config = load_yaml(CONFIG)
     chosen = apply_choices(config, choices)
@@ -102,11 +137,10 @@ def install_settings(choices: dict[str, object]) -> None:
     kept = [name for name in kept if name not in choices]
     if added or chosen:
         if CONFIG.exists():
-            backup = CONFIG.with_name(f"config.yml.before-starter-pack-{time.strftime('%Y%m%d-%H%M%S')}")
-            shutil.copy2(CONFIG, backup)
-            print(f"  saved your current settings to {backup}")
+            save_copy(CONFIG)
         CONFIG.parent.mkdir(parents=True, exist_ok=True)
-        CONFIG.write_text(yaml.safe_dump(config, sort_keys=False, allow_unicode=True), encoding="utf-8")
+        with CONFIG.open("w", encoding="utf-8") as handle:
+            yaml_io().dump(config, handle)
     for line in chosen:
         print(f"  set as you chose: {line}")
     if added:
@@ -121,44 +155,79 @@ def install_plugin(omp: str) -> None:
     if AUTOMODE_PACKAGE.exists():
         print("  pi-automode already installed")
         return
-    subprocess.run([omp, "plugin", "install", PLUGIN], check=True)
+    if subprocess.run([omp, "plugin", "install", PLUGIN]).returncode != 0:
+        print("  could not install pi-automode. Check your internet connection, then run this again.")
+
+
+def keeper_rule(glitch: Path) -> str:
+    template = json.loads((PACK / "automode.json").read_text(encoding="utf-8"))
+    rule = next(line for line in template["autoMode"]["allow"] if line.startswith(KEEPER_PREFIX))
+    return rule.replace("{{GLITCH}}", str(glitch))
 
 
 def install_automode_config(glitch: Path | None, github: list[str]) -> None:
-    if AUTOMODE_CONFIG.exists():
+    """Writes the pack's auto mode config, or, in one that exists, only the two lines that are
+    about this member: their GitHub names and their Glitch folder."""
+    exists = AUTOMODE_CONFIG.exists()
+    try:
+        config = json.loads((AUTOMODE_CONFIG if exists else PACK / "automode.json").read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        print(f"  could not read your auto mode config, so left it alone: {AUTOMODE_CONFIG}")
+        return
+    before = json.dumps(config)
+    auto = config.setdefault("autoMode", {})
+    if github or not exists:
+        environment = [
+            line
+            for line in auto.get("environment", ["$defaults"])
+            if line != "{{SOURCE_CONTROL}}" and not (github and line.startswith(SOURCE_PREFIX))
+        ]
+        if github:
+            environment.append(
+                f"{SOURCE_PREFIX} and organisations are {', '.join(github)}, with every repo under them. "
+                "Any other account or organisation is external."
+            )
+        auto["environment"] = environment
+    if glitch or not exists:
+        allow = [line for line in auto.get("allow", ["$defaults"]) if not line.startswith(KEEPER_PREFIX)]
+        if glitch:
+            allow.append(keeper_rule(glitch))
+        auto["allow"] = allow
+    if exists and json.dumps(config) == before:
         print(f"  left your auto mode config alone: {AUTOMODE_CONFIG}")
         return
-    config = json.loads((PACK / "automode.json").read_text(encoding="utf-8"))
-    auto = config["autoMode"]
-    source_control = (
-        f"Source control: the user's own GitHub accounts and organisations are {', '.join(github)}, "
-        "with every repo under them. Any other account or organisation is external."
-        if github
-        else None
-    )
-    auto["environment"] = [
-        source_control if line == "{{SOURCE_CONTROL}}" else line
-        for line in auto["environment"]
-        if line != "{{SOURCE_CONTROL}}" or source_control
-    ]
-    auto["allow"] = [
-        line.replace("{{GLITCH}}", str(glitch)) for line in auto["allow"] if "{{GLITCH}}" not in line or glitch
-    ]
+    if exists:
+        save_copy(AUTOMODE_CONFIG)
     AUTOMODE_CONFIG.parent.mkdir(parents=True, exist_ok=True)
     AUTOMODE_CONFIG.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
-    print(f"  wrote {AUTOMODE_CONFIG}")
+    print(f"  {'updated your GitHub names and Glitch folder in' if exists else 'wrote'} {AUTOMODE_CONFIG}")
 
 
 def install_extensions(glitch: Path | None) -> None:
     EXTENSIONS.mkdir(parents=True, exist_ok=True)
     names = ["automode-check.ts"] + (["glitch-hooks.ts"] if glitch else [])
     for name in names:
-        shutil.copyfile(PACK / name, EXTENSIONS / name)
-        print(f"  installed {EXTENSIONS / name}")
+        content = (PACK / name).read_bytes()
+        target = EXTENSIONS / name
+        if target.exists() and target.read_bytes() == content:
+            print(f"  already in place: {target}")
+            continue
+        verb = "updated" if target.exists() else "installed"
+        target.write_bytes(content)
+        print(f"  {verb} {target}")
+
+
+def git(glitch: Path, *args: str) -> str | None:
+    """A git command's output in the Glitch folder, or None when it fails or there is no git."""
+    program = shutil.which("git")
+    if not program:
+        return None
+    done = subprocess.run([program, "-C", str(glitch), *args], capture_output=True, text=True)
+    return done.stdout.strip() if done.returncode == 0 else None
 
 
 def is_ignored(glitch: Path) -> bool:
-    return subprocess.run(["git", "-C", str(glitch), "check-ignore", "-q", ".omp"]).returncode == 0
+    return git(glitch, "check-ignore", ".omp") is not None
 
 
 def install_glitch(glitch: Path) -> None:
@@ -170,12 +239,22 @@ def install_glitch(glitch: Path) -> None:
         shutil.copyfile(PACK / "glitch-project-config.yml", project_config)
         print(f"  wrote {project_config}")
     # Keep .omp/ out of Glitch's git without touching its managed .gitignore.
-    if not is_ignored(glitch):
-        exclude = glitch / ".git" / "info" / "exclude"
-        exclude.parent.mkdir(exist_ok=True)
-        with exclude.open("a", encoding="utf-8") as handle:
-            handle.write("\n.omp/\n")
-        print(f"  added .omp/ to {exclude}")
+    exclude = git(glitch, "rev-parse", "--git-path", "info/exclude")
+    if exclude is None:
+        print("  this Glitch folder is not a git checkout, so there is no git to keep .omp/ out of")
+    elif not is_ignored(glitch):
+        file = glitch / exclude
+        file.parent.mkdir(parents=True, exist_ok=True)
+        current = file.read_text(encoding="utf-8") if file.exists() else ""
+        file.write_text(current + ("" if not current or current.endswith("\n") else "\n") + ".omp/\n", encoding="utf-8")
+        print(f"  added .omp/ to {file}")
+    # The bridge gives each Glitch guard 10 seconds. The first run of a guard makes uv fetch
+    # Glitch's Python, so do that now rather than inside the first guarded action.
+    uv = shutil.which("uv")
+    if uv:
+        scripts = glitch / ".claude" / "scripts"
+        ready = subprocess.run([uv, "run", "--no-project", "--directory", str(scripts), "python", "--version"], capture_output=True)
+        print("  Glitch's guards are ready to run" if ready.returncode == 0 else "  could not prepare Glitch's guards: run /update in Glitch, then this again")
 
 
 def check(glitch: Path | None) -> bool:
@@ -187,6 +266,10 @@ def check(glitch: Path | None) -> bool:
         except json.JSONDecodeError:
             pass
     roles = config.get("modelRoles") or {}
+    pack = load_yaml(PACK / "settings.yml")
+    patterns = (config.get("bash") or {}).get("patterns") or []
+    folders = (config.get("tools") or {}).get("restrictedFolders") or []
+    resets = (config.get("claudeResets") or {}).get("autoRedeemWeekly")
     results = [
         (shutil.which("omp") is not None, "omp is on your PATH"),
         (AUTOMODE_PACKAGE.exists(), f"the {PLUGIN} plugin is installed"),
@@ -200,18 +283,21 @@ def check(glitch: Path | None) -> bool:
             isinstance((config.get("compaction") or {}).get("idleEnabled"), bool),
             f"idle compaction is decided: {'on' if (config.get('compaction') or {}).get('idleEnabled') else 'off'}",
         ),
-        (
-            (config.get("claudeResets") or {}).get("autoRedeemWeekly") == "no",
-            "saved Claude weekly resets are never spent automatically",
-        ),
+        (resets in ("no", "yes"), f"spending a saved Claude weekly reset automatically is decided: {resets}"),
         (all(role in roles for role in ("smol", "commit", "tiny", "memory", "judge")), "background helpers have their own models"),
+        (all(rule in patterns for rule in pack["bash"]["patterns"]), "the fixed rules against disk and home wipes are in place"),
+        (all(folder in folders for folder in pack["tools"]["restrictedFolders"]), "~/.ssh and ~/.aws are off limits"),
     ]
     if glitch:
         results += [
             (shutil.which("uv") is not None, "uv is on your PATH (Glitch's hooks run through it)"),
             ((EXTENSIONS / "glitch-hooks.ts").exists(), "the Glitch hook bridge is installed"),
             ((glitch / ".omp" / "config.yml").exists(), f"Glitch loads its Claude context under omp: {glitch}"),
-            (is_ignored(glitch), "Glitch's git ignores .omp/"),
+            (git(glitch, "rev-parse", "--git-dir") is None or is_ignored(glitch), "Glitch's git ignores .omp/"),
+            (
+                any(line.startswith(KEEPER_PREFIX) and str(glitch) in line for line in automode.get("allow") or []),
+                "auto mode lets Glitch's memory keeper run in this Glitch folder",
+            ),
         ]
     for ok, text in results:
         print(f"  {'ok  ' if ok else 'FAIL'}  {text}")
@@ -239,9 +325,9 @@ def main() -> int:
         print("Settings")
         install_settings(parse_choices(args.choices))
         print("Auto mode")
+        install_extensions(glitch)
         install_plugin(omp)
         install_automode_config(glitch, args.github)
-        install_extensions(glitch)
         if glitch:
             print(f"Glitch ({glitch})")
             install_glitch(glitch)
@@ -249,6 +335,8 @@ def main() -> int:
             print("No Glitch folder found: skipped the Glitch parts. Run again with --glitch PATH to add them.")
 
     print("Check")
+    if not glitch:
+        print("  No Glitch folder found, so the Glitch checks are skipped. Add --glitch PATH to include them.")
     ok = check(glitch)
     print("All good. Restart omp to pick the changes up." if ok else "Something is missing: see FAIL above.")
     return 0 if ok else 1

@@ -1,10 +1,11 @@
 # Setting someone up with the omp starter pack
 
 You are helping a Glitch member install this pack. They may be new to omp and to the terminal.
-Use plain words, ask one question at a time, and give your recommendation with each question.
+Use plain words, ask one thing at a time, and give your recommendation with each question.
 
-`README.md` says what the pack does and why. `install.py` does all the work: you collect the
-answers, build one command, run it, and read its output back.
+You are running in the pack's own folder, not in their Glitch folder. `README.md` says what
+the pack does and why. `install.py` does all the work: you collect the answers, build one
+command, run it, and read its output back.
 
 ## Rules
 
@@ -12,46 +13,64 @@ answers, build one command, run it, and read its output back.
   mode config by hand, and never offer to.
 - Find out what you can before asking. Ask only what the member has to decide.
 - If the member does not mind either way, take the recommendation.
-- Run the installer once, with every answer in it.
+- Run the installer once, with every answer in it. It is safe to run again later: to change
+  an answer, run it again with the new one.
 
 ## 1. Find out first
 
 - **omp**: `omp --version`. If it is missing, point them to
-  <https://github.com/can1357/oh-my-pi#install> and stop until it is installed and signed in
-  to Claude.
-- **Glitch folder**: the folder holding `.claude/hooks/write-guard.py`. Look in the current
-  folder and its parents; otherwise ask where their Glitch folder is. No Glitch folder is fine:
-  the installer then skips the Glitch parts.
-- **GitHub names**: `gh api user -q .login`, and the owners in `git remote -v` of their
-  projects. Confirm the list with them: these are the accounts auto mode will treat as theirs.
-- **Existing setup**: if `~/.omp/agent/config.yml` exists, read it. For any setting below that
-  they have already set, tell them its value and ask whether to keep it.
+  <https://github.com/can1357/oh-my-pi#install> and stop until it is installed.
+- **Signed in**: ask them to open omp, type "hello", and tell you whether it answered. If it
+  did not, they sign in to Claude inside omp first.
+- **Glitch folder**: ask where it is. It is the folder holding `.claude/hooks/write-guard.py`;
+  check that file exists before going on. No Glitch folder is fine: the installer then skips
+  the Glitch parts.
+- **GitHub names**: the accounts and organisations that are the member's own. Start from
+  `gh api user -q .login` if `gh` is signed in, and from the owners in `git remote -v` of each
+  project under `<Glitch folder>/workspaces/`. Do not use the Glitch folder's own remote: that
+  is Glitch's home, not theirs. Read the list back and let them correct it. Auto mode treats a
+  push to these as a push to their own space, so leave out anything they are unsure of.
+- **Existing setup**: if `~/.omp/agent/config.yml` exists, read it. If it already sets
+  `compaction.idleEnabled` or `compaction.idleThresholdTokens`, say what it is set to when you
+  ask the question below.
 
 ## 2. Ask
 
-**When should an idle conversation be shrunk?**
+**1. When should an idle conversation be shrunk?**
 
 omp resends the whole conversation on every turn, so a long one left open is costly to come
 back to. With this on, a conversation over the limit is shrunk to a summary plus its most
 recent messages after sitting idle for five minutes. Glitch saves the chat to memory first.
 
-- 200K tokens: the default, and the recommendation.
-- 150K: tighter, for a smaller Claude plan.
-- 300K: looser, when long sessions matter more than usage.
-- Off: never shrink an idle conversation.
+| Answer | Add to the command |
+|---|---|
+| 200K tokens: the recommendation | `--set compaction.idleEnabled=true --set compaction.idleThresholdTokens=200000` |
+| 150K: tighter, for a smaller Claude plan | `--set compaction.idleEnabled=true --set compaction.idleThresholdTokens=150000` |
+| 300K: looser, when long sessions matter more than usage | `--set compaction.idleEnabled=true --set compaction.idleThresholdTokens=300000` |
+| Off: never shrink an idle conversation | `--set compaction.idleEnabled=false` |
 
-→ `--set compaction.idleThresholdTokens=N`, or `--set compaction.idleEnabled=false`.
+**2. At what size should a conversation be shrunk while you are working?**
 
-That is the only question. Do not ask about the main model: they pick it in omp with `/model`.
-Do not ask about auto mode's own rules: the pack's are the starting point, and they can be
-changed later.
+The idle limit only helps a conversation left open. One you keep working in grows until omp
+shrinks it, and by default that is close to the model's limit: up to a million tokens on the
+large models, with every turn resending all of it. A working limit shrinks it earlier. On a
+model whose own limit is smaller than this number, omp ignores it and uses its default.
+
+| Answer | Add to the command |
+|---|---|
+| 325K tokens: the recommendation | `--set compaction.thresholdTokens=325000` |
+| 200K: tighter, for a smaller Claude plan | `--set compaction.thresholdTokens=200000` |
+| No working limit: omp's default | `--set compaction.thresholdTokens=-1` |
+
+Those are the only two settings to ask about. Do not ask about the main model: they pick it in
+omp with `/model`. Do not ask about auto mode's own rules: the pack's are the starting point.
 
 ## 3. Install
 
-Run from this folder, with one `--github` for each name:
+Run from this folder, with one `--github` for each name (none if they have no GitHub):
 
 ```sh
-uv run install.py --glitch <Glitch folder> --github <name> --set <key>=<value>
+uv run install.py --glitch <Glitch folder> --github <name> <the --set parts from the table>
 ```
 
 Read the output back in plain words: what was added, what was left as they had it, and what
@@ -61,7 +80,8 @@ was set because they chose it. If any line under `Check` says `FAIL`, say which 
 
 - Tell them to restart omp. Open omp sessions resend their whole conversation once after a
   settings change, so close the ones they do not need first.
-- Tell them to run `uv run install.py --check` after every omp or plugin update.
+- Tell them to run `uv run install.py --check --glitch <Glitch folder>` after every omp or
+  plugin update.
 - Tell them the three things from "Things to know" in `README.md` that matter day to day:
   approve risky actions in plain words in chat, a block is a block, and do not pin auto mode's
   checking model.

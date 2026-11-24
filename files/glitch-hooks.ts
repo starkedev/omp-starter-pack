@@ -23,7 +23,9 @@ import { spawn } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { fileURLToPath } from "node:url";
 import type { ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
+import type { Subprocess } from "bun";
 
 const TRANSCRIPT_DIR = path.join(os.homedir(), ".omp", "agent", "glitch", "transcripts");
 const GUARD_TIMEOUT_MS = 10_000;
@@ -65,13 +67,22 @@ async function runHook(
 	payload: Record<string, unknown>,
 	timeoutMs: number,
 ): Promise<HookOutput | undefined> {
-	const proc = Bun.spawn(hookCommand(root, script), {
-		cwd: root,
-		stdin: new Blob([JSON.stringify(payload)]),
-		stdout: "pipe",
-		stderr: "ignore",
-		env: { ...process.env, CLAUDE_PROJECT_DIR: root },
-	});
+	let proc: Subprocess<Blob, "pipe", "ignore">;
+	try {
+		proc = Bun.spawn(hookCommand(root, script), {
+			cwd: root,
+			stdin: new Blob([JSON.stringify(payload)]),
+			stdout: "pipe",
+			stderr: "ignore",
+			env: { ...process.env, CLAUDE_PROJECT_DIR: root },
+		});
+	} catch {
+		// No uv: a guard that cannot start refuses, in words the member can act on.
+		return {
+			permissionDecision: "deny",
+			permissionDecisionReason: "Glitch's guard could not start. Check that `uv` is installed and on your PATH.",
+		};
+	}
 	const timer = setTimeout(() => {
 		try {
 			proc.kill();
@@ -104,10 +115,26 @@ function runHookDetached(root: string, script: string, payload: Record<string, u
 	child.unref();
 }
 
-/** A tool path as a filesystem path: undefined for URLs, read selectors (`:50-80`, `?q=`) stripped. */
+/**
+ * A tool path as a filesystem path, spelled the way omp will open it: `~` expanded, `file://`
+ * converted, an edit header's `[path#TAG]` unwrapped, read selectors (`:50-80`, `?q=`) stripped.
+ * Undefined for other URLs.
+ */
 function fsPath(raw: string, cwd: string): string | undefined {
-	const trimmed = raw.trim();
+	let trimmed = raw.trim();
+	const header = /^\[(.+?)(?:#[0-9A-Za-z]+)?\]$/.exec(trimmed);
+	if (header) trimmed = header[1];
+	if (trimmed.startsWith("file://")) {
+		try {
+			trimmed = fileURLToPath(trimmed);
+		} catch {
+			return undefined;
+		}
+	}
 	if (!trimmed || URL_RE.test(trimmed)) return undefined;
+	if (trimmed === "~" || trimmed.startsWith("~/") || trimmed.startsWith("~\\")) {
+		trimmed = path.join(os.homedir(), trimmed.slice(1));
+	}
 	let candidate = path.resolve(cwd, trimmed.split("?")[0]);
 	while (!fs.existsSync(candidate)) {
 		const colon = candidate.lastIndexOf(":");
@@ -115,6 +142,20 @@ function fsPath(raw: string, cwd: string): string | undefined {
 		candidate = candidate.slice(0, colon);
 	}
 	return candidate;
+}
+
+/** The files an edit call names inside its text: hashline `[path#TAG]` headers and `MV dest`, and apply_patch file lines. */
+function editTargets(text: string): string[] {
+	const targets: string[] = [];
+	for (const line of text.split("\n")) {
+		const match =
+			/^\[(.+?)(?:#[0-9A-Za-z]+)?\]\s*$/.exec(line) ??
+			/^\*\*\* (?:Update|Add|Delete) File: (.+?)\s*$/.exec(line) ??
+			/^\*\*\* Move to: (.+?)\s*$/.exec(line) ??
+			/^MV\s+"?(.+?)"?\s*$/.exec(line);
+		if (match) targets.push(match[1]);
+	}
+	return targets;
 }
 
 /** `;`-separated grep/glob path lists, minus `!` excludes. */
@@ -232,6 +273,7 @@ export default function glitchHooks(pi: ExtensionAPI) {
 	});
 	pi.on("session_switch", (event, ctx) => queueSessionStart(ctx, event.reason === "new" ? "clear" : "resume"));
 	pi.on("session_compact", (_event, ctx) => queueSessionStart(ctx, "compact"));
+	pi.on("session_clear", (_event, ctx) => queueSessionStart(ctx, "clear"));
 
 	// ── UserPromptSubmit ──────────────────────────────────────────────────────────────────────
 	pi.on("input", async (event, ctx) => {
@@ -286,7 +328,12 @@ export default function glitchHooks(pi: ExtensionAPI) {
 			case "write":
 			case "edit":
 			case "ast_edit": {
-				const raw = Array.isArray(input.paths) ? input.paths : [input.path];
+				// omp's default edit sends only `input`: the files are named inside the text.
+				const named = Array.isArray(input.paths) ? input.paths : input.path !== undefined ? [input.path] : [];
+				const raw = named.length || typeof input.input !== "string" ? named : editTargets(input.input);
+				if (!raw.length) {
+					return { block: true, reason: "Glitch could not tell which file this call changes, so it was not run." };
+				}
 				const content =
 					typeof input.content === "string"
 						? input.content

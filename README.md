@@ -81,6 +81,9 @@ setting, a plugin that did not finish installing.
 - **Change settings in a quiet moment.** Any change to `~/.omp/agent/config.yml` makes every
   open omp session resend its whole conversation on its next turn. Close the sessions you do
   not need first.
+- **The Cursor sign-in is not Glitch's Cursor support.** `--sign-in cursor` lets omp use the
+  models in your Cursor plan. Glitch also works in the Cursor app itself, opened on your Glitch
+  folder (`## Cursor` in Glitch's `operations-reference.md`); that needs nothing from this pack.
 - **Do not pin auto mode's checking model.** The pack leaves it following your session's model.
   Pinned to one model, a rate limit on that model blocks every action.
 - **Approve risky actions in chat.** Auto mode reads your own messages as permission. It does
@@ -94,6 +97,11 @@ setting, a plugin that did not finish installing.
 
 ## Known gaps
 
+- **Glitch can't tell which omp window holds a task.** Glitch ties a task to the window working
+  on it, and finds the window from variables only Claude Code and Codex set. A task started in
+  omp is saved with no owner, so the features that rely on one (picking a task back up in the
+  same window, keeping it across `/clear`, warning that it is open elsewhere) don't apply. The
+  fix belongs in Glitch: omp already gives each command its session in `PI_SESSION_ID`.
 - **omp's `eval` tool is not covered by Glitch's guards.** It runs Python or JavaScript
   directly, and Glitch's hooks only know shell commands and file edits. Auto mode still
   checks it.

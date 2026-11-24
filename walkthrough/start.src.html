@@ -317,10 +317,10 @@ function App() {
       ${Object.entries(WORKING).map(([v, o]) => html`<${Choice} name="working" value=${v} current=${a.working} onPick=${set("working", "working")} title=${o.label} note=${o.note.replace("Recommended.", "Big enough for long tasks, well short of a million.")} rec=${v === "325000"} />`)}
     </div>`;
   if (step === 6) {
-    const missing = done.slice(1, 6).map((d, i) => d ? null : i + 1).filter(n => n != null);
+    const missing = done.map((d, i) => (i >= 1 && i <= 5 && !d) ? i : null).filter(i => i != null);
     body = html`<div class="finish">
       <h2 tabindex="-1">${missing.length ? "Almost there" : "Hand it to Claude"}</h2>
-      ${missing.length ? html`<p class="lede">Step ${missing.join(" and ")} still needs an answer. Pick it from the list on the left.</p>` : html`
+      ${missing.length ? html`<p class="lede">${missing.length === 1 ? "This step still needs" : "These steps still need"} an answer: ${missing.map((i, n) => html`${n ? " and " : ""}<a href="#" onClick=${e => { e.preventDefault(); go(i); }}>step ${i + 1} (${STEPS[i].replace(/^Your/, "your")})</a>`)}.</p>` : html`
       <ol>
         <li><p><b>Get the pack.</b> If you opened this page from the pack's folder, you already have it.</p>
           <pre class="cmd">git clone ${REPO}</pre></li>

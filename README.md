@@ -62,9 +62,10 @@ setting, a plugin that did not finish installing.
   not read a tick in a form or a line in a file that way. If it blocks something you want, say
   so in plain words and ask again.
 - **A block is a block.** If the agent tries another route to the same action, stop it.
-- **Reads are not checked by auto mode.** The pack sets `classifyReadOnlyTools` to `false`,
-  because checking every read multiplies the calls. Inside your Glitch folder, Glitch's own
-  read guard still applies.
+- **Reads outside the folder you are working in are checked.** Glitch treats a read outside
+  your Glitch folder as something to ask about, and the pack keeps to that everywhere: auto
+  mode checks reads (`classifyReadOnlyTools`), but lets reads inside the working folder through
+  without a model call (`allowInsideWorkingDirectory`), so ordinary work costs nothing extra.
 - **Rate limits.** The pack sets up no fallback to another provider. If you add one
   (`retry.fallbackChains`), make sure any model standing in for your image model can read
   images: a text-only stand-in answers image questions blind instead of failing.

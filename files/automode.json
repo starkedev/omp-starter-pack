@@ -4,7 +4,7 @@
     "classifierReasoningLevel": "low",
     "fastClassifierMaxTokens": 2048,
     "classifierTimeoutMs": 45000,
-    "classifyReadOnlyTools": false,
+    "classifyReadOnlyTools": true,
     "allowInsideWorkingDirectory": true,
     "environment": [
       "$defaults",

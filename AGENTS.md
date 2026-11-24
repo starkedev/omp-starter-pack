@@ -20,10 +20,10 @@ command, run it, and read its output back.
 
 - **omp**: `omp --version`. If it is missing, point them to
   <https://github.com/can1357/oh-my-pi#install> and stop until it is installed.
-- **Sign-in**: ask which sign-in they use in omp: Claude, ChatGPT (Codex), or something else.
-  Then ask them to open omp, type "hello", and tell you whether it answered. If it did not,
-  they sign in inside omp first. The answer picks the helper models:
-  `--helpers claude`, `--helpers codex`, or nothing for anything else.
+- **Sign-in**: ask which sign-in they use in omp: Claude, ChatGPT (Codex), Mistral, or
+  something else. Then ask them to open omp, type "hello", and tell you whether it answered.
+  If it did not, they sign in inside omp first. The answer picks the helper models:
+  `--helpers claude`, `--helpers codex`, `--helpers mistral`, or nothing for anything else.
 - **Glitch folder**: ask where it is. It is the folder holding `.claude/hooks/write-guard.py`;
   check that file exists before going on. No Glitch folder is fine: the installer then skips
   the Glitch parts.

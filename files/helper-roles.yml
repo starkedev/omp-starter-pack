@@ -17,3 +17,10 @@ codex:
   tiny: openai-codex/gpt-6-luna
   memory: openai-codex/gpt-6-luna
   judge: openai-codex/gpt-6-luna
+mistral:
+  smol: mistral/zai-glm-5-3-flash
+  vision: mistral/zai-glm-5-3-flash
+  commit: mistral/zai-glm-5-3-flash
+  tiny: mistral/zai-glm-5-3-flash
+  memory: mistral/zai-glm-5-3-flash
+  judge: mistral/zai-glm-5-3-flash

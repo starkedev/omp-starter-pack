@@ -3,8 +3,8 @@
 The least you need to run Glitch under [omp](https://github.com/can1357/oh-my-pi) without the
 problems I ran into in my first three weeks with it. One command sets it up; a second checks it.
 
-It is for Glitch members who already use Claude Code and want to try omp. It changes nothing in
-Glitch's engine.
+It is for Glitch members who already use Claude Code and want to try omp, with a Claude sign-in
+or another provider's. It changes nothing in Glitch's engine.
 
 ## What it sets up
 
@@ -16,7 +16,7 @@ Glitch's engine.
 | Auto mode ignores a config in the wrong place and runs on its defaults. | Writes the config where the plugin reads it under omp: `~/.omp/agent/extensions/pi-automode/config.json`. |
 | Auto mode blocks ordinary actions with "response was not 0 or 1" or a timeout. | Sets a 45 second timeout and tells the checking model to answer with one character. This reduces the blocks; a full fix is waiting upstream ([pi-automode#86](https://github.com/czottmann/pi-automode/pull/86)). |
 | A session left open keeps growing, and every turn resends all of it. | Turns on idle compaction: a session over 200K tokens is shrunk once it sits idle. The guided setup also offers a limit for sessions you keep working in. |
-| Background helpers (titles, commit messages, memory, image reads) run on your most expensive model. | Gives those helpers Haiku and Sonnet. Your main model is yours to pick with `/model`. |
+| Background helpers (titles, commit messages, memory, image reads) run on your most expensive model. | Gives those helpers small models from the sign-in you use (`--helpers claude` or `--helpers codex`). Your main model is yours to pick with `/model`. |
 | omp can spend a saved Claude weekly reset by itself. | Turns that off. |
 | Secrets in your environment can end up in what the model reads. | Turns on omp's redaction of environment secrets and token-shaped strings. |
 | If auto mode is down, nothing stops a disastrous command. | Adds fixed rules that need no model: the plainest forms of a disk or home wipe are refused, and omp's file tools ask before touching `~/.ssh` and `~/.aws`. These are a last line, not a net: a differently spelled command gets past them. |

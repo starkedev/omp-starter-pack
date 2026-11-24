@@ -20,8 +20,10 @@ command, run it, and read its output back.
 
 - **omp**: `omp --version`. If it is missing, point them to
   <https://github.com/can1357/oh-my-pi#install> and stop until it is installed.
-- **Signed in**: ask them to open omp, type "hello", and tell you whether it answered. If it
-  did not, they sign in to Claude inside omp first.
+- **Sign-in**: ask which sign-in they use in omp: Claude, ChatGPT (Codex), or something else.
+  Then ask them to open omp, type "hello", and tell you whether it answered. If it did not,
+  they sign in inside omp first. The answer picks the helper models:
+  `--helpers claude`, `--helpers codex`, or nothing for anything else.
 - **Glitch folder**: ask where it is. It is the folder holding `.claude/hooks/write-guard.py`;
   check that file exists before going on. No Glitch folder is fine: the installer then skips
   the Glitch parts.
@@ -67,13 +69,16 @@ model whose own limit is smaller than this number, omp ignores it and uses its d
 
 Those are the only two settings to ask about. Do not ask about the main model: they pick it in
 omp with `/model`. Do not ask about auto mode's own rules: the pack's are the starting point.
+If they later change sign-in, they run the installer again with the other `--helpers` and
+`--set modelRoles.<role>=<model>` for each role already set, since it never replaces a
+setting by itself.
 
 ## 3. Install
 
 Run from this folder, with one `--github` for each name (none if they have no GitHub):
 
 ```sh
-uv run install.py --glitch <Glitch folder> --github <name> <the --set parts from the table>
+uv run install.py --glitch <Glitch folder> --github <name> --helpers <sign-in> <the --set parts from the tables>
 ```
 
 Read the output back in plain words: what was added, what was left as they had it, and what

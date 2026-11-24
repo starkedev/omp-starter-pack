@@ -130,10 +130,13 @@ def save_copy(file: Path) -> None:
     print(f"  saved a copy of what you had: {backup}")
 
 
-def install_settings(choices: dict[str, object]) -> None:
+def install_settings(choices: dict[str, object], helpers: str | None) -> None:
     config = load_yaml(CONFIG)
     chosen = apply_choices(config, choices)
-    added, kept = add_missing(config, load_yaml(PACK / "settings.yml"))
+    pack = load_yaml(PACK / "settings.yml")
+    if helpers:
+        pack["modelRoles"] = load_yaml(PACK / "helper-roles.yml")[helpers]
+    added, kept = add_missing(config, pack)
     kept = [name for name in kept if name not in choices]
     if added or chosen:
         if CONFIG.exists():
@@ -265,7 +268,6 @@ def check(glitch: Path | None) -> bool:
             automode = json.loads(AUTOMODE_CONFIG.read_text(encoding="utf-8")).get("autoMode", {})
         except json.JSONDecodeError:
             pass
-    roles = config.get("modelRoles") or {}
     pack = load_yaml(PACK / "settings.yml")
     patterns = (config.get("bash") or {}).get("patterns") or []
     folders = (config.get("tools") or {}).get("restrictedFolders") or []
@@ -284,7 +286,6 @@ def check(glitch: Path | None) -> bool:
             f"idle compaction is decided: {'on' if (config.get('compaction') or {}).get('idleEnabled') else 'off'}",
         ),
         (resets in ("no", "yes"), f"spending a saved Claude weekly reset automatically is decided: {resets}"),
-        (all(role in roles for role in ("smol", "commit", "tiny", "memory", "judge")), "background helpers have their own models"),
         (all(rule in patterns for rule in pack["bash"]["patterns"]), "the fixed rules against disk and home wipes are in place"),
         (all(folder in folders for folder in pack["tools"]["restrictedFolders"]), "~/.ssh and ~/.aws are off limits"),
     ]
@@ -309,6 +310,7 @@ def main() -> int:
     parser.add_argument("--glitch", type=Path, help="your Glitch folder (found by itself when you run this inside it)")
     parser.add_argument("--github", action="append", default=[], metavar="NAME", help="a GitHub account or organisation that is yours (repeatable)")
     parser.add_argument("--set", action="append", default=[], metavar="KEY=VALUE", dest="choices", help="a setting you chose, e.g. compaction.idleThresholdTokens=150000 (repeatable)")
+    parser.add_argument("--helpers", choices=sorted(load_yaml(PACK / "helper-roles.yml")), help="give omp's background helpers small models from the sign-in you use")
     parser.add_argument("--check", action="store_true", help="check an install and change nothing")
     args = parser.parse_args()
 
@@ -323,7 +325,7 @@ def main() -> int:
             print("omp is not installed, or not on your PATH. Install it first, then run this again.")
             return 2
         print("Settings")
-        install_settings(parse_choices(args.choices))
+        install_settings(parse_choices(args.choices), args.helpers)
         print("Auto mode")
         install_extensions(glitch)
         install_plugin(omp)

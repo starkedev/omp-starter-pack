@@ -2,17 +2,6 @@
 # only where you have not set the key yourself. omp strips comments from config.yml,
 # so this file is the place to read why each one is here.
 
-# Background helpers (commit messages, session titles, memory, judging, image reads) run on
-# small models. Unset, they run on whatever model the session uses. Your main model is left
-# alone: pick it with /model.
-modelRoles:
-  smol: anthropic/claude-sonnet-5-5:medium
-  vision: anthropic/claude-sonnet-5-5
-  commit: anthropic/claude-haiku-5-5
-  tiny: anthropic/claude-haiku-5-5
-  memory: anthropic/claude-haiku-5-5
-  judge: anthropic/claude-haiku-5-5
-
 # Shrink a session over 200K tokens once it sits idle, so a window left open overnight
 # does not resend a huge conversation on its next turn.
 compaction:

@@ -25,6 +25,12 @@ beside each one.
 
 ## Install
 
+**The easy way:** open this folder in Claude Code (or omp) and say "set me up". It asks a few
+questions, such as when an idle conversation should be shrunk, then runs the installer for you.
+`AGENTS.md` is the script it follows.
+
+**By hand:**
+
 1. Install omp ([instructions](https://github.com/can1357/oh-my-pi#install)) and sign in to Claude in it.
 2. From your Glitch folder, run:
 
@@ -39,7 +45,8 @@ beside each one.
 
 The installer never overwrites a setting you already have or an auto mode config that already
 exists. It adds what is missing, says what it left alone, and saves a copy of your settings
-first.
+first. To choose a value yourself, add `--set`, for example
+`--set compaction.idleThresholdTokens=150000`.
 
 ## After every omp or plugin update
 

@@ -4,11 +4,12 @@
 # ///
 """omp starter pack for Glitch: install it, or check an install.
 
-    uv run install.py [--glitch PATH] [--github NAME ...]
+    uv run install.py [--glitch PATH] [--github NAME ...] [--set KEY=VALUE ...]
     uv run install.py --check [--glitch PATH]
 
 Installing never overwrites a setting or an auto mode config you already have: it adds what
-is missing and says what it left alone. Run --check after every omp or plugin update.
+is missing and says what it left alone. Only --set changes a setting you already have, because
+you chose it. Run --check after every omp or plugin update.
 """
 
 from __future__ import annotations
@@ -66,20 +67,53 @@ def add_missing(target: dict, source: dict, prefix: str = "") -> tuple[list[str]
     return added, kept
 
 
-def install_settings() -> None:
+def parse_choices(pairs: list[str]) -> dict[str, object]:
+    choices: dict[str, object] = {}
+    for pair in pairs:
+        key, sep, value = pair.partition("=")
+        if not sep or not key:
+            raise SystemExit(f"--set needs KEY=VALUE, got: {pair}")
+        choices[key] = yaml.safe_load(value)
+    return choices
+
+
+def apply_choices(config: dict, choices: dict[str, object]) -> list[str]:
+    """Sets each chosen dotted key. Returns a line for each one that changed."""
+    changed: list[str] = []
+    for dotted, value in choices.items():
+        *parents, leaf = dotted.split(".")
+        node = config
+        for part in parents:
+            child = node.get(part)
+            if not isinstance(child, dict):
+                child = node[part] = {}
+            node = child
+        if node.get(leaf, ...) != value:
+            before = f" (was {node[leaf]})" if leaf in node else ""
+            node[leaf] = value
+            changed.append(f"{dotted} = {value}{before}")
+    return changed
+
+
+def install_settings(choices: dict[str, object]) -> None:
     config = load_yaml(CONFIG)
+    chosen = apply_choices(config, choices)
     added, kept = add_missing(config, load_yaml(PACK / "settings.yml"))
-    if added:
+    kept = [name for name in kept if name not in choices]
+    if added or chosen:
         if CONFIG.exists():
             backup = CONFIG.with_name(f"config.yml.before-starter-pack-{time.strftime('%Y%m%d-%H%M%S')}")
             shutil.copy2(CONFIG, backup)
             print(f"  saved your current settings to {backup}")
         CONFIG.parent.mkdir(parents=True, exist_ok=True)
         CONFIG.write_text(yaml.safe_dump(config, sort_keys=False, allow_unicode=True), encoding="utf-8")
+    for line in chosen:
+        print(f"  set as you chose: {line}")
+    if added:
         print(f"  added: {', '.join(added)}")
     if kept:
         print(f"  left as you set them: {', '.join(kept)}")
-    if not added and not kept:
+    if not added and not kept and not chosen:
         print("  settings already in place")
 
 
@@ -162,7 +196,10 @@ def check(glitch: Path | None) -> bool:
             "auto mode's checker follows your session's model (no classifierModel pinned)",
         ),
         ((EXTENSIONS / "automode-check.ts").exists(), "the auto-mode-not-loaded warning is installed"),
-        ((config.get("compaction") or {}).get("idleEnabled") is True, "idle sessions are compacted"),
+        (
+            isinstance((config.get("compaction") or {}).get("idleEnabled"), bool),
+            f"idle compaction is decided: {'on' if (config.get('compaction') or {}).get('idleEnabled') else 'off'}",
+        ),
         (
             (config.get("claudeResets") or {}).get("autoRedeemWeekly") == "no",
             "saved Claude weekly resets are never spent automatically",
@@ -185,6 +222,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--glitch", type=Path, help="your Glitch folder (found by itself when you run this inside it)")
     parser.add_argument("--github", action="append", default=[], metavar="NAME", help="a GitHub account or organisation that is yours (repeatable)")
+    parser.add_argument("--set", action="append", default=[], metavar="KEY=VALUE", dest="choices", help="a setting you chose, e.g. compaction.idleThresholdTokens=150000 (repeatable)")
     parser.add_argument("--check", action="store_true", help="check an install and change nothing")
     args = parser.parse_args()
 
@@ -199,7 +237,7 @@ def main() -> int:
             print("omp is not installed, or not on your PATH. Install it first, then run this again.")
             return 2
         print("Settings")
-        install_settings()
+        install_settings(parse_choices(args.choices))
         print("Auto mode")
         install_plugin(omp)
         install_automode_config(glitch, args.github)

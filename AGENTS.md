@@ -29,34 +29,22 @@ answers, build one command, run it, and read its output back.
 
 ## 2. Ask
 
-1. **When should an idle conversation be shrunk?**
-   omp resends the whole conversation on every turn, so a long one left open is costly to
-   come back to. With this on, a conversation over the limit is shrunk to a summary plus its
-   most recent messages after sitting idle for five minutes. Glitch saves the chat to memory
-   first.
-   - 200K tokens: the default, and the recommendation.
-   - 150K: tighter, for a smaller Claude plan.
-   - 300K: looser, when long sessions matter more than usage.
-   - Off: never shrink an idle conversation.
+**When should an idle conversation be shrunk?**
 
-   → `--set compaction.idleThresholdTokens=N`, or `--set compaction.idleEnabled=false`.
+omp resends the whole conversation on every turn, so a long one left open is costly to come
+back to. With this on, a conversation over the limit is shrunk to a summary plus its most
+recent messages after sitting idle for five minutes. Glitch saves the chat to memory first.
 
-2. **Should a conversation also be shrunk while you are working, at a fixed size?**
-   By default omp only does this close to the model's limit, which on a large model is far
-   past the point where each turn is expensive.
-   - No fixed size: the default, and the recommendation unless usage runs out often.
-   - 300K tokens: a ceiling on the cost of any one turn.
+- 200K tokens: the default, and the recommendation.
+- 150K: tighter, for a smaller Claude plan.
+- 300K: looser, when long sessions matter more than usage.
+- Off: never shrink an idle conversation.
 
-   → `--set compaction.thresholdTokens=N`. Nothing for the default.
+→ `--set compaction.idleThresholdTokens=N`, or `--set compaction.idleEnabled=false`.
 
-3. **May omp spend a saved Claude weekly reset by itself?**
-   - No: the recommendation. They decide when to spend one.
-   - Yes.
-
-   → Nothing for no. `--set claudeResets.autoRedeemWeekly=yes` for yes.
-
-Do not ask about the main model: they pick it in omp with `/model`. Do not ask about auto
-mode's own rules: the pack's are the starting point, and they can be changed later.
+That is the only question. Do not ask about the main model: they pick it in omp with `/model`.
+Do not ask about auto mode's own rules: the pack's are the starting point, and they can be
+changed later.
 
 ## 3. Install
 

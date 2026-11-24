@@ -26,10 +26,9 @@ claudeResets:
 secrets:
   enabled: true
 
-# Auto mode (the pi-automode plugin) checks risky actions, so omp's own prompts are off.
-# The rules under bash.patterns need no model: they hold even when auto mode is not loaded.
+# Fixed rules that need no model: they hold even when auto mode (the pi-automode plugin,
+# which checks risky actions) is not loaded.
 tools:
-  approvalMode: yolo
   restrictedFolders:
     - ~/.ssh
     - ~/.aws
@@ -53,27 +52,3 @@ bash:
       approval: deny
     - match: "*--no-preserve-root*"
       approval: deny
-    # Force pushes: always ask.
-    - match: "git push --force*"
-      approval: prompt
-    - match: "git push -f*"
-      approval: prompt
-    - match: "git push * --force*"
-      approval: prompt
-    - match: "git push * -f"
-      approval: prompt
-    - match: "git push * -f *"
-      approval: prompt
-    # Piping a download into a shell: always ask.
-    - match: "*| sh"
-      approval: prompt
-    - match: "*| bash"
-      approval: prompt
-    - match: "*|sh"
-      approval: prompt
-    - match: "*|bash"
-      approval: prompt
-    - match: "*| sh -*"
-      approval: prompt
-    - match: "*| bash -*"
-      approval: prompt

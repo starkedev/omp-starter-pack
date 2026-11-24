@@ -18,16 +18,16 @@ Glitch's engine.
 | A session left open keeps growing, and every turn resends all of it. | Turns on idle compaction: a session over 200K tokens is shrunk once it sits idle. |
 | Background helpers (titles, commit messages, memory) run on your most expensive model. | Gives those helpers Haiku and Sonnet. Your main model is yours to pick with `/model`. |
 | omp can spend a saved Claude weekly reset by itself. | Turns that off. |
-| If auto mode is down, nothing stops a disastrous command. | Adds fixed rules that need no model: disk and home wipes are refused, force pushes and piping a download into a shell always ask, and `~/.ssh` and `~/.aws` are off limits. |
+| If auto mode is down, nothing stops a disastrous command. | Adds fixed rules that need no model: disk and home wipes are refused, and `~/.ssh` and `~/.aws` are off limits. |
 
 `files/settings.yml` and `files/automode.json` hold the settings themselves, with the reason
 beside each one.
 
 ## Install
 
-**The easy way:** open this folder in Claude Code (or omp) and say "set me up". It asks a few
-questions, such as when an idle conversation should be shrunk, then runs the installer for you.
-`AGENTS.md` is the script it follows.
+**The easy way:** open this folder in Claude Code (or omp) and say "set me up". It confirms your
+Glitch folder and GitHub names, asks when an idle conversation should be shrunk, then runs the
+installer for you. `AGENTS.md` is the script it follows.
 
 **By hand:**
 
@@ -72,9 +72,6 @@ setting, a plugin that did not finish installing.
   your Glitch folder as something to ask about, and the pack keeps to that everywhere: auto
   mode checks reads (`classifyReadOnlyTools`), but lets reads inside the working folder through
   without a model call (`allowInsideWorkingDirectory`), so ordinary work costs nothing extra.
-- **Rate limits.** The pack sets up no fallback to another provider. If you add one
-  (`retry.fallbackChains`), make sure any model standing in for your image model can read
-  images: a text-only stand-in answers image questions blind instead of failing.
 
 ## Remove it
 

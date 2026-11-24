@@ -6,6 +6,18 @@ problems I ran into in my first three weeks with it. One command sets it up; a s
 It is for Glitch members who already use Claude Code and want to try omp, with a Claude sign-in
 or another provider's. It changes nothing in Glitch's engine.
 
+## Start here
+
+1. **Get the pack.** On this repo's GitHub page, click **Code**, then **Download ZIP**, and unzip
+   it. Or, in a terminal: `git clone https://github.com/starkedev/omp-starter-pack`
+2. **Open `start.html`** from the pack's folder in your browser: double-click it. Nothing to
+   install, and it works offline. From a terminal in the pack's folder, run `open start.html`
+   on a Mac, `xdg-open start.html` on Linux, or `start start.html` on Windows.
+3. **Answer its five questions.** At the end it gives you a prompt to copy.
+4. **Open Claude Code in the pack's folder**: in a terminal, `cd` into it (from a ZIP it is
+   called `omp-starter-pack-main`), then run `claude`. Paste the prompt and answer anything it
+   asks. When it's done, restart omp.
+
 ## What it sets up
 
 | Problem | What the pack does |
@@ -27,11 +39,9 @@ holds auto mode's rules.
 
 ## Install
 
-**The easy way:** open `start.html` in your browser (double-click it; it needs no internet). It
-walks you through five questions and gives you a prompt to paste into Claude Code (or omp),
-opened in this folder. Claude checks your answers, runs the installer and reads the result back.
-`AGENTS.md` is the script it follows; saying "set me up" without the prompt works too, and it
-asks the same questions in chat.
+**The easy way:** the steps under [Start here](#start-here). Claude follows `AGENTS.md`; saying
+"set me up" in Claude Code in this folder, without the prompt, works too, and it asks the same
+questions in chat.
 
 **By hand:**
 

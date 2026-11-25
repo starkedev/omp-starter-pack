@@ -120,26 +120,19 @@ const { useEffect } = htmPreact;
 
 const REPO = "https://github.com/starkedev/omp-starter-pack";
 
-const SIGNINS = {
-  claude: { label: "Claude", note: "Claude Pro or Max.", idle: "claude" },
-  codex: { label: "ChatGPT (Codex)", note: "A ChatGPT plan.", idle: "never" },
-  cursor: { label: "Cursor", note: "A Cursor plan.", idle: "other" },
-  grok: { label: "Grok", note: "An xAI (Grok) account.", idle: "other" },
-  mistral: { label: "Mistral", note: "A Mistral plan.", idle: "other" },
-};
 const IDLE = {
   "200000": { label: "Over 200K tokens", note: "Recommended.", set: "--set compaction.idleEnabled=true --set compaction.idleThresholdTokens=200000", words: "shrink it when it is over 200K tokens" },
-  "150000": { label: "Over 150K tokens", note: "Tighter, for a smaller Claude plan.", set: "--set compaction.idleEnabled=true --set compaction.idleThresholdTokens=150000", words: "shrink it when it is over 150K tokens" },
+  "150000": { label: "Over 150K tokens", note: "Tighter, for a smaller plan.", set: "--set compaction.idleEnabled=true --set compaction.idleThresholdTokens=150000", words: "shrink it when it is over 150K tokens" },
   "300000": { label: "Over 300K tokens", note: "Looser, when long sessions matter more than usage.", set: "--set compaction.idleEnabled=true --set compaction.idleThresholdTokens=300000", words: "shrink it when it is over 300K tokens" },
   off: { label: "Never", note: "Leave idle conversations as they are.", set: "--set compaction.idleEnabled=false", words: "never shrink it" },
 };
 const WORKING = {
   "325000": { label: "At 325K tokens", note: "Recommended.", set: "--set compaction.thresholdTokens=325000", words: "shrink it at 325K tokens" },
-  "200000": { label: "At 200K tokens", note: "Tighter, for a smaller Claude plan.", set: "--set compaction.thresholdTokens=200000", words: "shrink it at 200K tokens" },
+  "200000": { label: "At 200K tokens", note: "Tighter, for a smaller plan.", set: "--set compaction.thresholdTokens=200000", words: "shrink it at 200K tokens" },
   none: { label: "Only near the model's limit", note: "omp's default: up to a million tokens on the large models.", set: "--set compaction.thresholdTokens=-1", words: "no working limit (omp's default)" },
 };
 
-const STEPS = ["Before you start", "Your sign-ins", "Your Glitch folder", "Your GitHub", "Idle conversations", "While you work", "Hand it to Claude"];
+const STEPS = ["Before you start", "Your Glitch folder", "Your GitHub", "Idle conversations", "While you work", "Hand it to Claude"];
 
 function shq(s) {
   if (/^[\w@%+=:,./~-]+$/.test(s)) return s;
@@ -153,12 +146,6 @@ function buildPrompt(a) {
   lines.push("Set me up with the omp starter pack. Follow AGENTS.md in this folder.");
   lines.push("");
   lines.push("I went through the walkthrough (start.html). My answers:");
-  let sign = null;
-  if (a.signins.length) sign = a.signins.map(k => SIGNINS[k].label).join(", then ")
-    + (a.signins.length > 1 ? ", in that order" : "")
-    + ` (${a.signins.map(k => "--sign-in " + k).join(" ")})` + (a.other ? "; I also use another provider" : "");
-  else if (a.other) sign = "another provider, none of the listed ones (no --sign-in)";
-  lines.push(["- Sign-ins I use in omp: ", sign, "signin"]);
   const glitch = a.glitch.trim() || null;
   lines.push(["- My Glitch folder: ", glitch, "glitch"]);
   let gh = null;
@@ -181,7 +168,6 @@ function installCommand(a) {
   const parts = ["uv run install.py"];
   if (a.glitch.trim()) parts.push("--glitch " + shq(a.glitch.trim()));
   if (a.ghMode === "list") names(a.gh).forEach(n => parts.push("--github " + shq(n)));
-  a.signins.forEach(k => parts.push("--sign-in " + k));
   if (a.idle) parts.push(IDLE[a.idle].set);
   if (a.working) parts.push(WORKING[a.working].set);
   return parts.join(" ");
@@ -223,61 +209,34 @@ function Slip({ answers, lastChanged }) {
 function App() {
   const [step, setStep] = useState(0);
   const [seen, setSeen] = useState(0);
-  const [a, setA] = useState({ signins: [], other: false, glitch: "", ghMode: "find", gh: "", idle: "200000", working: "325000" });
+  const [a, setA] = useState({ glitch: "", ghMode: "find", gh: "", idle: "200000", working: "325000" });
   const [lastChanged, setLastChanged] = useState(null);
   const top = useRef(null);
   const set = (key, slot) => value => { setA(prev => ({ ...prev, [key]: value })); setLastChanged(slot); };
   const go = n => { setStep(n); setSeen(s => Math.max(s, n)); top.current && top.current.scrollIntoView({ block: "start" }); };
   useEffect(() => { const h = top.current && top.current.querySelector("h2"); h && h.focus(); }, [step]);
 
-  const toggleSignin = k => set("signins", "signin")(a.signins.includes(k) ? a.signins.filter(x => x !== k) : [...a.signins, k]);
-  const moveSignin = (k, by) => {
-    const list = [...a.signins]; const i = list.indexOf(k); const j = i + by;
-    if (j < 0 || j >= list.length) return;
-    [list[i], list[j]] = [list[j], list[i]];
-    set("signins", "signin")(list);
-  };
-  const firstIdle = a.signins.length ? SIGNINS[a.signins[0]].idle : "other";
-  const done = [true, a.signins.length > 0 || a.other, !!a.glitch.trim(), a.ghMode !== "list" || names(a.gh).length > 0, !!a.idle, !!a.working, false];
+  const done = [true, !!a.glitch.trim(), a.ghMode !== "list" || names(a.gh).length > 0, !!a.idle, !!a.working, false];
   const canNext = done[step];
 
   let body;
   if (step === 0) body = html`
     <h2 tabindex="-1">Set up omp to run Glitch</h2>
-    <p class="lede">Five short questions, then you get one prompt to paste into Claude Code. Claude checks your answers and runs the starter pack's installer for you.</p>
+    <p class="lede">Four short questions, then you get one prompt to paste into Claude Code. Claude checks your answers and runs the starter pack's installer for you.</p>
     <p class="why">What the pack fixes, from three weeks of running Glitch under omp:</p>
     <ul class="fixes">
       <li>Glitch's own guards keep working<span>Its hooks for engine files, secrets and outside reads run in omp too.</span></li>
       <li>Auto mode blocks less, and you know when it isn't on<span>Fewer "response was not 0 or 1" blocks, and a warning if it fails to load after an update.</span></li>
       <li>Long sessions cost less<span>A conversation is shrunk once it gets big or sits idle, and Glitch saves it to memory first.</span></li>
-      <li>Background helpers run on small models<span>Titles, commit messages and image reads stop spending your main model's usage.</span></li>
-      <li>A limit on one sign-in doesn't stop you<span>Signed in to more than one? When one hits a rate or usage limit, omp carries on with the next.</span></li>
+      <li>Background helpers run on small models<span>A provider guide checks which of your plans each vendor allows in omp, then sets small models for titles, commit messages and image reads.</span></li>
     </ul>
     <p class="why">You need these on your computer first:</p>
     <ul class="need">
-      <li><b>omp</b><span>The coding agent this sets up. Install it from <a href="https://github.com/can1357/oh-my-pi#install">its install page</a>, open it, and sign in.</span></li>
+      <li><b>omp</b><span>The coding agent this sets up. Install it from <a href="https://github.com/can1357/oh-my-pi#install">its install page</a>. Signing in to a provider can wait: the pack's provider guide helps with that afterwards.</span></li>
       <li><b>uv</b><span>Runs the installer. Glitch's own setup already put it there.</span></li>
       <li><b>Claude Code</b><span>Runs the setup for you. omp works for this too.</span></li>
     </ul>`;
   if (step === 1) body = html`
-    <h2 tabindex="-1">Which sign-ins do you use in omp?</h2>
-    <p class="why">Tick each one you're signed in to, then put them in order. The first one's small models run omp's background helpers. When a model hits a rate or usage limit, omp moves to the next sign-in down the list, and back once the limit resets.</p>
-    <ol class="order">
-      ${[...a.signins, ...Object.keys(SIGNINS).filter(k => !a.signins.includes(k))].map(k => {
-        const s = SIGNINS[k]; const pos = a.signins.indexOf(k);
-        return html`<li key=${k}><label class="choice">
-          <input type="checkbox" checked=${pos >= 0} onChange=${() => toggleSignin(k)} />
-          <div><b>${pos >= 0 ? html`<span class="pos">${pos + 1}</span>` : null}${s.label}${pos === 0 ? html`<span class="rec">helpers</span>` : null}</b><span>${s.note}</span></div>
-          ${pos >= 0 && a.signins.length > 1 ? html`<div class="moves">
-            <button type="button" class="outline small" aria-label=${"Move " + s.label + " up"} disabled=${pos === 0} onClick=${e => { e.preventDefault(); moveSignin(k, -1); }}>↑</button>
-            <button type="button" class="outline small" aria-label=${"Move " + s.label + " down"} disabled=${pos === a.signins.length - 1} onClick=${e => { e.preventDefault(); moveSignin(k, 1); }}>↓</button>
-          </div>` : null}
-        </label></li>`;
-      })}
-    </ol>
-    <label class="check"><input type="checkbox" checked=${a.other} onChange=${e => set("other", "signin")(e.target.checked)} /> I also use something else (an API key or another provider)</label>
-    <p class="why">Not signed in yet? Open omp, type <kbd>/login</kbd>, and check it answers a "hello" before you go on. Only tick sign-ins that work.</p>`;
-  if (step === 2) body = html`
     <h2 tabindex="-1">Where is your Glitch folder?</h2>
     <p class="why">The folder you open Claude Code in to talk to Glitch. It holds <code>.claude/hooks/write-guard.py</code>; Claude checks that before installing.</p>
     <div class="field">
@@ -285,7 +244,7 @@ function App() {
       <input id="glitch" type="text" placeholder="~/glitch" value=${a.glitch} onInput=${e => set("glitch", "glitch")(e.target.value)} />
       <small>On a Mac, drag the folder into a terminal window to see its path.</small>
     </div>`;
-  if (step === 3) body = html`
+  if (step === 2) body = html`
     <h2 tabindex="-1">Which GitHub accounts are yours?</h2>
     <p class="why">Auto mode treats a push to these as a push to your own space. A push anywhere else gets a closer look. Leave out anything you're unsure of; not Glitch's own repo.</p>
     <div class="choices">
@@ -297,26 +256,22 @@ function App() {
       <label for="gh">GitHub names, separated by commas</label>
       <input id="gh" type="text" placeholder="your-username, your-org" value=${a.gh} onInput=${e => set("gh", "gh")(e.target.value)} />
     </div>` : null}`;
-  if (step === 4) body = html`
+  if (step === 3) body = html`
     <h2 tabindex="-1">When should an idle conversation be shrunk?</h2>
     <p class="lede">omp resends the whole conversation on every turn, so a long one left open is costly to come back to. With this on, one over the limit that you leave alone is shrunk to a summary plus its latest messages. Glitch saves the chat to memory first.</p>
-    <p class="why">${firstIdle === "never"
-      ? "On a ChatGPT sign-in this never happens: its saved copy of the conversation doesn't expire. The next question is the one that counts for you."
-      : firstIdle === "claude"
-        ? "On a Claude sign-in it happens a little under an hour after your last message, just before Claude's saved copy of the conversation expires."
-        : "It happens once the conversation has sat idle for a while, up to an hour."}</p>
+    <p class="why">It happens once the conversation has sat idle long enough that the provider's saved copy is about to expire, up to an hour. A provider whose saved copy never expires, such as a ChatGPT plan, never triggers it; the next question is the one that counts there.</p>
     <div class="choices">
       ${Object.entries(IDLE).map(([v, o]) => html`<${Choice} name="idle" value=${v} current=${a.idle} onPick=${set("idle", "idle")} title=${o.label} note=${o.note.replace("Recommended.", "The middle ground.")} rec=${v === "200000"} />`)}
     </div>`;
-  if (step === 5) body = html`
+  if (step === 4) body = html`
     <h2 tabindex="-1">How big can a conversation get while you work?</h2>
     <p class="lede">The idle limit only helps a conversation you leave. One you keep working in grows until omp shrinks it, and by default that is close to the model's limit, with every turn resending all of it.</p>
     <p class="why">On a model whose own limit is smaller than this, omp uses its default instead.</p>
     <div class="choices">
       ${Object.entries(WORKING).map(([v, o]) => html`<${Choice} name="working" value=${v} current=${a.working} onPick=${set("working", "working")} title=${o.label} note=${o.note.replace("Recommended.", "Big enough for long tasks, well short of a million.")} rec=${v === "325000"} />`)}
     </div>`;
-  if (step === 6) {
-    const missing = done.map((d, i) => (i >= 1 && i <= 5 && !d) ? i : null).filter(i => i != null);
+  if (step === 5) {
+    const missing = done.map((d, i) => (i >= 1 && i <= 4 && !d) ? i : null).filter(i => i != null);
     body = html`<div class="finish">
       <h2 tabindex="-1">${missing.length ? "Almost there" : "Hand it to Claude"}</h2>
       ${missing.length ? html`<p class="lede">${missing.length === 1 ? "This step still needs" : "These steps still need"} an answer: ${missing.map((i, n) => html`${n ? " and " : ""}<a href="#" onClick=${e => { e.preventDefault(); go(i); }}>step ${i + 1} (${STEPS[i].replace(/^Your/, "your")})</a>`)}.</p>` : html`
@@ -326,6 +281,7 @@ function App() {
         <li><p><b>Open Claude Code in the pack's folder</b>, not your Glitch folder. In a terminal, go to the pack's folder (from a ZIP download it is called <code>omp-starter-pack-main</code>) and start Claude Code:</p>
           <pre class="cmd">cd omp-starter-pack    # omp-starter-pack-main if you downloaded the ZIP${"\n"}claude</pre></li>
         <li><p><b>Paste the prompt</b> from the right and answer anything it asks. When it's done, restart omp.</p></li>
+        <li><p><b>Set up your providers.</b> In omp, say "set up my providers". The pack's guide checks which of your plans each vendor allows in omp. A Claude plan isn't one: for Claude, keep using Claude Code in your Glitch folder.</p></li>
       </ol>
       <details><summary>Rather run it yourself?</summary>
         <p class="why">This is the command Claude should end up running, from the pack's folder. Claude also checks your answers first; on your own, check the Glitch folder path is right.</p>
@@ -340,14 +296,14 @@ function App() {
       <div><h1>omp starter pack for Glitch</h1><p>Answer a few questions; Claude does the setup.</p></div>
     </header>
     <ol class="rail">
-      ${STEPS.map((s, i) => html`<li class=${(i === step ? "here " : "") + (i > 0 && i < 6 && i <= seen && done[i] && i !== step ? "done" : "")}>
+      ${STEPS.map((s, i) => html`<li class=${(i === step ? "here " : "") + (i > 0 && i < 5 && i <= seen && done[i] && i !== step ? "done" : "")}>
         <button onClick=${() => go(i)} aria-current=${i === step ? "step" : null}><span class="n">${i + 1}</span>${s}</button></li>`)}
     </ol>
     <section class="step">
       ${body}
       <div class="nav">
         ${step > 0 ? html`<button class="outline" onClick=${() => go(step - 1)}>Back</button>` : null}
-        ${step < 6 ? html`<button onClick=${() => go(step + 1)} disabled=${!canNext}>${step === 0 ? "Start" : "Next"}</button>` : null}
+        ${step < 5 ? html`<button onClick=${() => go(step + 1)} disabled=${!canNext}>${step === 0 ? "Start" : "Next"}</button>` : null}
       </div>
     </section>
     <${Slip} answers=${a} lastChanged=${lastChanged} />

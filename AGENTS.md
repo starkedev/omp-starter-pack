@@ -21,12 +21,9 @@ command, run it, and read its output back.
 - **omp**: `omp --version`. If it is missing, point them to
   <https://github.com/can1357/oh-my-pi#install> and stop until it is installed. If it is older
   than 19.1.1, have them run `omp update` first; the installer refuses older versions.
-- **Sign-ins**: ask which sign-ins they use in omp: Claude, ChatGPT (Codex), Cursor, Grok,
-  Mistral, or something else. Then ask them to open omp, type "hello", and tell you whether it
-  answered. If it did not, they sign in inside omp first. With more than one, ask which to use
-  first: the first one's small models run the background helpers, and when one hits a rate or
-  usage limit, omp moves to the next in that order. Add one `--sign-in` for each, in that
-  order: `claude`, `codex`, `cursor`, `grok`, `mistral`. Leave out "something else".
+- **omp works**: ask them to open omp, type "hello", and tell you whether it answered. If it did
+  not, they have no provider yet: the installer doesn't need one, but omp is no use until it has
+  one. After the install, the provider guide helps them choose (step 4).
 - **Glitch folder**: ask where it is. It is the folder holding `.claude/hooks/write-guard.py`;
   check that file exists before going on. No Glitch folder is fine: the installer then skips
   the Glitch parts.
@@ -45,15 +42,15 @@ command, run it, and read its output back.
 
 omp resends the whole conversation on every turn, so a long one left open is costly to come
 back to. With this on, a conversation over the limit that is left alone is shrunk to a summary
-plus its most recent messages. With a Claude sign-in that happens a little under an hour after
-the last message, just before the provider's saved copy of the conversation expires. With a
-ChatGPT (Codex) sign-in it does not happen at all, because that saved copy never expires; the
-working limit below is what counts there. Glitch saves the chat to memory first.
+plus its most recent messages, once it has sat idle long enough that the provider's saved copy
+of it is about to expire (up to an hour). A provider whose saved copy never expires, such as a
+ChatGPT plan, never triggers it; the working limit below is what counts there. Glitch saves the
+chat to memory first.
 
 | Answer | Add to the command |
 |---|---|
 | 200K tokens: the recommendation | `--set compaction.idleEnabled=true --set compaction.idleThresholdTokens=200000` |
-| 150K: tighter, for a smaller Claude plan | `--set compaction.idleEnabled=true --set compaction.idleThresholdTokens=150000` |
+| 150K: tighter, for a smaller plan | `--set compaction.idleEnabled=true --set compaction.idleThresholdTokens=150000` |
 | 300K: looser, when long sessions matter more than usage | `--set compaction.idleEnabled=true --set compaction.idleThresholdTokens=300000` |
 | Off: never shrink an idle conversation | `--set compaction.idleEnabled=false` |
 
@@ -67,21 +64,19 @@ model whose own limit is smaller than this number, omp ignores it and uses its d
 | Answer | Add to the command |
 |---|---|
 | 325K tokens: the recommendation | `--set compaction.thresholdTokens=325000` |
-| 200K: tighter, for a smaller Claude plan | `--set compaction.thresholdTokens=200000` |
+| 200K: tighter, for a smaller plan | `--set compaction.thresholdTokens=200000` |
 | No working limit: omp's default | `--set compaction.thresholdTokens=-1` |
 
-Those are the only two settings to ask about. Do not ask about the main model: they pick it in
-omp with `/model`. Do not ask about auto mode's own rules: the pack's are the starting point.
-If they later change sign-ins, they run the installer again with the new `--sign-in` list and
-`--set` for each `modelRoles.<role>` or `retry.fallbackChains` entry already set, since it
-never replaces a setting by itself.
+Those are the only two settings to ask about. Do not ask about the main model or providers: the
+provider guide covers those after the install. Do not ask about auto mode's own rules: the pack's
+are the starting point.
 
 ## 3. Install
 
 Run from this folder, with one `--github` for each name (none if they have no GitHub):
 
 ```sh
-uv run install.py --glitch <Glitch folder> --github <name> --sign-in <first> --sign-in <next> <the --set parts from the tables>
+uv run install.py --glitch <Glitch folder> --github <name> <the --set parts from the tables>
 ```
 
 Read the output back in plain words: what was added, what was left as they had it, and what
@@ -91,6 +86,10 @@ was set because they chose it. If any line under `Check` says `FAIL`, say which 
 
 - Tell them to restart omp. Open omp sessions resend their whole conversation once after a
   settings change, so close the ones they do not need first.
+- Tell them about the provider guide: in omp, they say "set up my providers". It checks which
+  of their plans the vendor allows in omp, signs them in, and gives the background helpers small
+  models. Say plainly that a Claude plan is not allowed in omp; for Claude they use Claude Code
+  in their Glitch folder, or an Anthropic API key in omp.
 - Tell them to run `uv run install.py --check --glitch <Glitch folder>` after every omp or
   plugin update.
 - Tell them the three things from "Things to know" in `README.md` that matter day to day:

@@ -30,6 +30,7 @@ OMP_HOME = Path.home() / ".omp"
 AGENT = OMP_HOME / "agent"
 CONFIG = AGENT / "config.yml"
 EXTENSIONS = AGENT / "extensions"
+SKILL = AGENT / "skills" / "omp-providers" / "SKILL.md"
 AUTOMODE_CONFIG = EXTENSIONS / "pi-automode" / "config.json"
 PLUGINS_MANIFEST = OMP_HOME / "plugins" / "package.json"
 PLUGIN = "@czottmann/pi-automode"
@@ -137,44 +138,10 @@ def save_copy(file: Path) -> None:
     print(f"  saved a copy of what you had: {backup}")
 
 
-def sign_in_models(order: list[str]) -> dict:
-    """Settings for the sign-ins in fallback order: the first one's helper models, and a fallback
-    chain from each model to the same kind of model on the sign-ins after it."""
-    sign_ins = load_yaml(PACK / "sign-ins.yml")
-    first = sign_ins[order[0]]
-    settings: dict = {"modelRoles": dict(first["helpers"])}
-    if len(order) < 2:
-        return settings
-    chains: dict[str, list[str]] = {}
-
-    def chain(key: str, targets: list[str]) -> None:
-        if key in chains:  # one model serving two roles takes the first role's chain
-            return
-        targets = [t for i, t in enumerate(targets) if t != key and t not in targets[:i]]
-        if targets:
-            chains[key] = targets
-
-    # Main models first: an exact key per sign-in, plus the provider's wildcard for a model picked
-    # with /model. Where a sign-in's main model also runs its helpers (Codex), the main chain wins:
-    # a limit on the model you work with should land on the next main model, not a helper.
-    for i, name in enumerate(order):
-        later = [sign_ins[other]["main"] for other in order[i + 1:]] + [sign_ins[other]["main"] for other in order[:i]]
-        main = sign_ins[name]["main"]
-        chain(main, later)
-        chain(main.split("/")[0] + "/*", later)
-    # Helpers: exact keys beat the wildcard, so each falls to the same kind of helper.
-    for role, model in first["helpers"].items():
-        chain(model, [sign_ins[name]["helpers"][role] for name in order[1:]])
-    settings["retry"] = {"rateLimitWalksChain": True, "fallbackChains": chains}
-    return settings
-
-
-def install_settings(choices: dict[str, object], sign_ins: list[str]) -> None:
+def install_settings(choices: dict[str, object]) -> None:
     config = load_yaml(CONFIG)
     chosen = apply_choices(config, choices)
     pack = load_yaml(PACK / "settings.yml")
-    if sign_ins:
-        pack.update(sign_in_models(sign_ins))
     added, kept = add_missing(config, pack)
     kept = [name for name in kept if name not in choices]
     if added or chosen:
@@ -279,6 +246,18 @@ def install_extensions(glitch: Path | None) -> None:
         print(f"  {verb} {target}")
 
 
+def install_skill() -> None:
+    """The provider guide: a skill omp loads, so a member can say "set up my providers" in omp."""
+    content = (PACK / "skills" / "omp-providers" / "SKILL.md").read_bytes()
+    if SKILL.exists() and SKILL.read_bytes() == content:
+        print(f"  already in place: {SKILL}")
+        return
+    verb = "updated" if SKILL.exists() else "installed"
+    SKILL.parent.mkdir(parents=True, exist_ok=True)
+    SKILL.write_bytes(content)
+    print(f"  {verb} {SKILL}")
+
+
 def git(glitch: Path, *args: str) -> str | None:
     """A git command's output in the Glitch folder, or None when it fails or there is no git."""
     program = shutil.which("git")
@@ -330,7 +309,6 @@ def check(glitch: Path | None) -> bool:
     pack = load_yaml(PACK / "settings.yml")
     patterns = (config.get("bash") or {}).get("patterns") or []
     folders = (config.get("tools") or {}).get("restrictedFolders") or []
-    resets = (config.get("claudeResets") or {}).get("autoRedeemWeekly")
     results = [
         (shutil.which("omp") is not None, "omp is on your PATH"),
         (
@@ -348,9 +326,9 @@ def check(glitch: Path | None) -> bool:
             isinstance((config.get("compaction") or {}).get("idleEnabled"), bool),
             f"idle compaction is decided: {'on' if (config.get('compaction') or {}).get('idleEnabled') else 'off'}",
         ),
-        (resets in ("no", "yes"), f"spending a saved Claude weekly reset automatically is decided: {resets}"),
         (all(rule in patterns for rule in pack["bash"]["patterns"]), "the fixed rules against disk and home wipes are in place"),
         (all(folder in folders for folder in pack["tools"]["restrictedFolders"]), "~/.ssh and ~/.aws are off limits"),
+        (SKILL.exists(), f"the provider guide is installed: {SKILL}"),
     ]
     if glitch:
         results += [
@@ -373,7 +351,6 @@ def main() -> int:
     parser.add_argument("--glitch", type=Path, help="your Glitch folder (found by itself when you run this inside it)")
     parser.add_argument("--github", action="append", default=[], metavar="NAME", help="a GitHub account or organisation that is yours (repeatable)")
     parser.add_argument("--set", action="append", default=[], metavar="KEY=VALUE", dest="choices", help="a setting you chose, e.g. compaction.idleThresholdTokens=150000 (repeatable)")
-    parser.add_argument("--sign-in", action="append", default=[], dest="sign_ins", metavar="NAME", choices=list(load_yaml(PACK / "sign-ins.yml")), help="a sign-in you use in omp; repeat in the order to fall back through them, first is used for the helpers")
     parser.add_argument("--check", action="store_true", help="check an install and change nothing")
     args = parser.parse_args()
 
@@ -393,7 +370,9 @@ def main() -> int:
             print(f"omp is {found}; the pack needs {'.'.join(map(str, OMP_MINIMUM))} or newer. Run `omp update`, then run this again.")
             return 2
         print("Settings")
-        install_settings(parse_choices(args.choices), args.sign_ins)
+        install_settings(parse_choices(args.choices))
+        print("Provider guide")
+        install_skill()
         print("Auto mode")
         install_extensions(glitch)
         install_plugin(omp)

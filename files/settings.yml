@@ -7,10 +7,6 @@
 compaction:
   idleEnabled: true
 
-# Never spend a saved Claude weekly reset automatically.
-claudeResets:
-  autoRedeemWeekly: "no"
-
 # Redact secrets from your environment and token-shaped strings before the model sees them.
 secrets:
   enabled: true

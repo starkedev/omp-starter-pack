@@ -3,8 +3,10 @@
 The least you need to run Glitch under [omp](https://github.com/can1357/oh-my-pi) without the
 problems I ran into in my first three weeks with it. One command sets it up; a second checks it.
 
-It is for Glitch members who already use Claude Code and want to try omp, with a Claude sign-in
-or another provider's. It changes nothing in Glitch's engine.
+It is for Glitch members who already use Claude Code and want to try omp. It changes nothing in
+Glitch's engine, and it doesn't sign you in to anything: omp runs on whichever providers you
+choose, and the pack's provider guide helps you pick ones whose terms allow it (see
+[Choosing providers](#choosing-providers)).
 
 ## Start here
 
@@ -29,9 +31,7 @@ or another provider's. It changes nothing in Glitch's engine.
 | Auto mode blocks ordinary actions with "response was not 0 or 1" or a timeout. | A reply that isn't a bare "0" now goes to the detailed check instead of blocking ([pi-automode#86](https://github.com/czottmann/pi-automode/pull/86)). Also sets a 45 second timeout and tells the checking model to answer with one character. |
 | Every action is checked by your main model, which is slow and spends your usage. | Auto mode checks with your small helper model (`@smol`) and falls back to `@tiny` ([pi-automode#88](https://github.com/czottmann/pi-automode/pull/88)). With no helper models set, both are your session's model. |
 | A session left open keeps growing, and every turn resends all of it. | Turns on idle compaction: a session over 200K tokens is shrunk once it sits idle. The guided setup also offers a limit for sessions you keep working in. |
-| Background helpers (titles, commit messages, memory, image reads) run on your most expensive model. | Gives those helpers small models from your first sign-in (`--sign-in claude`, `codex`, `cursor`, `grok` or `mistral`). Your main model is yours to pick with `/model`. |
-| A rate or usage limit on one sign-in stops your work. | With more than one sign-in, sets omp to move to the next one in your order when a model hits a limit (helpers to the next sign-in's helpers, your main model to its main model), and back once the limit resets. |
-| omp can spend a saved Claude weekly reset by itself. | Turns that off. |
+| Picking a provider is a minefield: several vendors forbid using their plan in omp, and omp doesn't say so. | Installs a provider guide, an omp skill. Say "set up my providers" in omp: it checks each plan against the vendor's own terms, signs you in, gives the background helpers small models, and sets a fallback between providers. |
 | Secrets in your environment can end up in what the model reads. | Turns on omp's redaction of environment secrets and token-shaped strings. |
 | If auto mode is down, nothing stops a disastrous command. | Adds fixed rules that need no model: the plainest forms of a disk or home wipe are refused, and omp's file tools ask before touching `~/.ssh` and `~/.aws`. These are a last line, not a net: a differently spelled command gets past them. |
 
@@ -46,19 +46,16 @@ questions in chat.
 
 **By hand:**
 
-1. Install omp ([instructions](https://github.com/can1357/oh-my-pi#install)) and sign in to it.
+1. Install omp ([instructions](https://github.com/can1357/oh-my-pi#install)) and sign in to a
+   provider in it ([Choosing providers](#choosing-providers)).
 2. From your Glitch folder, run:
 
    ```sh
-   uv run /path/to/omp-starter-pack/install.py --github YOUR-GITHUB-NAME --sign-in claude
+   uv run /path/to/omp-starter-pack/install.py --github YOUR-GITHUB-NAME
    ```
 
    `--github` names an account or organisation that is yours, so auto mode knows a push there is
    not a push to a stranger. Repeat it for each one. Leave it out if you do not use GitHub.
-
-   `--sign-in` names a sign-in you use in omp. Repeat it in the order to fall back through them,
-   for example `--sign-in claude --sign-in codex`. `files/sign-ins.yml` lists the models each one
-   uses.
 
 3. Restart omp.
 
@@ -67,6 +64,23 @@ fixed rules, it adds the pack's beside yours), says what it left alone, and save
 file before changing it. In an auto mode config that already exists it touches only two lines:
 your GitHub names and your Glitch folder. To choose a value yourself, add `--set`, for example
 `--set compaction.idleThresholdTokens=150000`.
+
+## Choosing providers
+
+omp can sign in to many plans, but a plan is a deal with its vendor, and several vendors allow
+their plan only in their own tools or ones they've approved. An API key, paid per use, works
+anywhere. As of 25 November 2026:
+
+- **Fine:** any API key, a Mistral plan (its sign-in creates an ordinary API key), and a ChatGPT
+  plan (OpenAI welcomes open-source tools on its plans, though omp doesn't use OpenAI's approved
+  sign-in yet).
+- **Not allowed:** Claude, Cursor, Grok and z.ai Coding Plan sign-ins in omp. Their terms limit
+  plans to their own or named tools, and omp isn't one; Cursor has said so about omp by name.
+  Anthropic, xAI and z.ai API keys are fine instead; Cursor has no API key for omp.
+- **For Claude on your plan,** use Claude Code itself in your Glitch folder. It runs Glitch fully.
+
+The provider guide (`files/skills/omp-providers/SKILL.md`) has the sources for each and walks you
+through the setup. Terms change, so it checks the source before recommending anything.
 
 ## After every omp or plugin update
 
@@ -82,9 +96,9 @@ setting, a plugin that did not finish installing.
 - **Change settings in a quiet moment.** Any change to `~/.omp/agent/config.yml` makes every
   open omp session resend its whole conversation on its next turn. Close the sessions you do
   not need first.
-- **The Cursor sign-in is not Glitch's Cursor support.** `--sign-in cursor` lets omp use the
-  models in your Cursor plan. Glitch also works in the Cursor app itself, opened on your Glitch
-  folder (`## Cursor` in Glitch's `operations-reference.md`); that needs nothing from this pack.
+- **Glitch also works in the Cursor app.** Opened on your Glitch folder, Glitch runs in Cursor
+  itself (`## Cursor` in Glitch's `operations-reference.md`); that needs nothing from this pack
+  and is allowed, unlike signing in to Cursor from omp.
 - **Keep a fallback for auto mode's checking model.** The pack sets it to your `smol` role with
   `tiny` as the fallback. Pinned to one model with no fallback, a rate limit on that model blocks
   every action.

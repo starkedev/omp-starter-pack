@@ -23,10 +23,11 @@ or another provider's. It changes nothing in Glitch's engine.
 | Problem | What the pack does |
 |---|---|
 | Glitch's guards, secret scan and memory do not run under omp. They are Claude Code hooks, and omp does not read them. | Installs a bridge, `glitch-hooks.ts`, that runs every Glitch hook on the matching omp event, and loads `CLAUDE.md` and your persona the way Claude Code does. |
-| omp either asks before every action or checks nothing. | Installs auto mode (the `pi-automode` plugin): a second model call judges each risky action, and routine work goes through without a prompt. |
+| omp either asks before every action or checks nothing. | Installs auto mode (the `pi-automode` plugin): a second model call judges each risky action, and routine work goes through without a prompt. The pack installs pi-automode 1.18.0 with fixes not yet released upstream, from [starkedev/pi-automode](https://github.com/starkedev/pi-automode/tree/v1.18.0-sd.1). Needs omp 19.1.1 or newer. |
 | Auto mode can fail to load after an update, and omp gives no sign. Nothing is then checked. | Installs a warning that appears on your first prompt when auto mode is missing. |
 | Auto mode ignores a config in the wrong place and runs on its defaults. | Writes the config where the plugin reads it under omp: `~/.omp/agent/extensions/pi-automode/config.json`. |
-| Auto mode blocks ordinary actions with "response was not 0 or 1" or a timeout. | Sets a 45 second timeout and tells the checking model to answer with one character. This reduces the blocks; a full fix is waiting upstream ([pi-automode#86](https://github.com/czottmann/pi-automode/pull/86)). |
+| Auto mode blocks ordinary actions with "response was not 0 or 1" or a timeout. | A reply that isn't a bare "0" now goes to the detailed check instead of blocking ([pi-automode#86](https://github.com/czottmann/pi-automode/pull/86)). Also sets a 45 second timeout and tells the checking model to answer with one character. |
+| Every action is checked by your main model, which is slow and spends your usage. | Auto mode checks with your small helper model (`@smol`) and falls back to `@tiny` ([pi-automode#88](https://github.com/czottmann/pi-automode/pull/88)). With no helper models set, both are your session's model. |
 | A session left open keeps growing, and every turn resends all of it. | Turns on idle compaction: a session over 200K tokens is shrunk once it sits idle. The guided setup also offers a limit for sessions you keep working in. |
 | Background helpers (titles, commit messages, memory, image reads) run on your most expensive model. | Gives those helpers small models from your first sign-in (`--sign-in claude`, `codex`, `cursor`, `grok` or `mistral`). Your main model is yours to pick with `/model`. |
 | A rate or usage limit on one sign-in stops your work. | With more than one sign-in, sets omp to move to the next one in your order when a model hits a limit (helpers to the next sign-in's helpers, your main model to its main model), and back once the limit resets. |
@@ -84,8 +85,9 @@ setting, a plugin that did not finish installing.
 - **The Cursor sign-in is not Glitch's Cursor support.** `--sign-in cursor` lets omp use the
   models in your Cursor plan. Glitch also works in the Cursor app itself, opened on your Glitch
   folder (`## Cursor` in Glitch's `operations-reference.md`); that needs nothing from this pack.
-- **Do not pin auto mode's checking model.** The pack leaves it following your session's model.
-  Pinned to one model, a rate limit on that model blocks every action.
+- **Keep a fallback for auto mode's checking model.** The pack sets it to your `smol` role with
+  `tiny` as the fallback. Pinned to one model with no fallback, a rate limit on that model blocks
+  every action.
 - **Approve risky actions in chat.** Auto mode reads your own messages as permission. It does
   not read a tick in a form or a line in a file that way. If it blocks something you want, say
   so in plain words and ask again.

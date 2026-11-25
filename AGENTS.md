@@ -19,7 +19,8 @@ command, run it, and read its output back.
 ## 1. Find out first
 
 - **omp**: `omp --version`. If it is missing, point them to
-  <https://github.com/can1357/oh-my-pi#install> and stop until it is installed.
+  <https://github.com/can1357/oh-my-pi#install> and stop until it is installed. If it is older
+  than 19.1.1, have them run `omp update` first; the installer refuses older versions.
 - **Sign-ins**: ask which sign-ins they use in omp: Claude, ChatGPT (Codex), Cursor, Grok,
   Mistral, or something else. Then ask them to open omp, type "hello", and tell you whether it
   answered. If it did not, they sign in inside omp first. With more than one, ask which to use
@@ -93,5 +94,5 @@ was set because they chose it. If any line under `Check` says `FAIL`, say which 
 - Tell them to run `uv run install.py --check --glitch <Glitch folder>` after every omp or
   plugin update.
 - Tell them the three things from "Things to know" in `README.md` that matter day to day:
-  approve risky actions in plain words in chat, a block is a block, and do not pin auto mode's
-  checking model.
+  approve risky actions in plain words in chat, a block is a block, and keep a fallback for auto
+  mode's checking model.

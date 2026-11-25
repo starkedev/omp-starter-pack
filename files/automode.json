@@ -1,6 +1,8 @@
 {
   "autoMode": {
     "enabled": true,
+    "classifierModel": "@smol",
+    "classifierFallbackModels": ["@tiny"],
     "classifierReasoningLevel": "low",
     "fastClassifierMaxTokens": 2048,
     "classifierTimeoutMs": 45000,

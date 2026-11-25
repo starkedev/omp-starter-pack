@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -30,8 +31,14 @@ AGENT = OMP_HOME / "agent"
 CONFIG = AGENT / "config.yml"
 EXTENSIONS = AGENT / "extensions"
 AUTOMODE_CONFIG = EXTENSIONS / "pi-automode" / "config.json"
-AUTOMODE_PACKAGE = OMP_HOME / "plugins" / "node_modules" / "@czottmann" / "pi-automode" / "package.json"
+PLUGINS_MANIFEST = OMP_HOME / "plugins" / "package.json"
 PLUGIN = "@czottmann/pi-automode"
+# pi-automode 1.18.0 with fixes not released upstream yet: "response was not 0 or 1" goes to the
+# detailed check instead of blocking (czottmann/pi-automode#86), the checker model can be an omp
+# role such as @smol (#88), and an ordered list of fallback checker models (upstream main).
+PLUGIN_SPEC = "github:starkedev/pi-automode#v1.18.0-sd.1"
+# The first omp whose extensions can resolve a role such as @smol (`ctx.models.resolve`).
+OMP_MINIMUM = (19, 1, 1)
 GLITCH_MARKER = Path(".claude") / "hooks" / "write-guard.py"
 SOURCE_PREFIX = "Source control: the user's own GitHub accounts"
 KEEPER_PREFIX = "Glitch Memory Keeper:"
@@ -186,11 +193,31 @@ def install_settings(choices: dict[str, object], sign_ins: list[str]) -> None:
         print("  settings already in place")
 
 
+def plugin_installed() -> bool:
+    """True when omp's plugins come from the pack's pi-automode, not the stock npm release."""
+    try:
+        manifest = json.loads(PLUGINS_MANIFEST.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    return (manifest.get("dependencies") or {}).get(PLUGIN) == PLUGIN_SPEC
+
+
+def omp_version(omp: str | None) -> tuple[int, ...] | None:
+    if not omp:
+        return None
+    try:
+        out = subprocess.run([omp, "--version"], capture_output=True, text=True, timeout=30, check=False).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    found = re.search(r"(\d+)\.(\d+)\.(\d+)", out)
+    return tuple(int(part) for part in found.groups()) if found else None
+
+
 def install_plugin(omp: str) -> None:
-    if AUTOMODE_PACKAGE.exists():
+    if plugin_installed():
         print("  pi-automode already installed")
         return
-    if subprocess.run([omp, "plugin", "install", PLUGIN]).returncode != 0:
+    if subprocess.run([omp, "plugin", "install", PLUGIN_SPEC]).returncode != 0:
         print("  could not install pi-automode. Check your internet connection, then run this again.")
 
 
@@ -306,11 +333,15 @@ def check(glitch: Path | None) -> bool:
     resets = (config.get("claudeResets") or {}).get("autoRedeemWeekly")
     results = [
         (shutil.which("omp") is not None, "omp is on your PATH"),
-        (AUTOMODE_PACKAGE.exists(), f"the {PLUGIN} plugin is installed"),
+        (
+            (omp_version(shutil.which("omp")) or (0,)) >= OMP_MINIMUM,
+            f"omp is {'.'.join(map(str, OMP_MINIMUM))} or newer, so auto mode can use your helper models",
+        ),
+        (plugin_installed(), f"pi-automode is the pack's version ({PLUGIN_SPEC})"),
         (automode.get("enabled") is True, f"auto mode config is readable and on: {AUTOMODE_CONFIG}"),
         (
-            "classifierModel" not in automode,
-            "auto mode's checker follows your session's model (no classifierModel pinned)",
+            not automode.get("classifierModel") or bool(automode.get("classifierFallbackModels")),
+            "auto mode's checker has a fallback model, so one model's rate limit can't block everything",
         ),
         ((EXTENSIONS / "automode-check.ts").exists(), "the auto-mode-not-loaded warning is installed"),
         (
@@ -355,6 +386,11 @@ def main() -> int:
         omp = shutil.which("omp")
         if not omp:
             print("omp is not installed, or not on your PATH. Install it first, then run this again.")
+            return 2
+        version = omp_version(omp)
+        if version is None or version < OMP_MINIMUM:
+            found = ".".join(map(str, version)) if version else "an unknown version"
+            print(f"omp is {found}; the pack needs {'.'.join(map(str, OMP_MINIMUM))} or newer. Run `omp update`, then run this again.")
             return 2
         print("Settings")
         install_settings(parse_choices(args.choices), args.sign_ins)

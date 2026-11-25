@@ -48,11 +48,15 @@ questions in chat.
 
 1. Install omp ([instructions](https://github.com/can1357/oh-my-pi#install)) and sign in to a
    provider in it ([Choosing providers](#choosing-providers)).
-2. From your Glitch folder, run:
+2. Get the pack and run the installer from its folder, naming your Glitch folder:
 
    ```sh
-   uv run /path/to/omp-starter-pack/install.py --github YOUR-GITHUB-NAME
+   git clone https://github.com/starkedev/omp-starter-pack
+   cd omp-starter-pack
+   uv run install.py --glitch ~/glitch --github YOUR-GITHUB-NAME
    ```
+
+   Use your own Glitch folder in place of `~/glitch`.
 
    `--github` names an account or organisation that is yours, so auto mode knows a push there is
    not a push to a stranger. Repeat it for each one. Leave it out if you do not use GitHub.
@@ -84,8 +88,10 @@ through the setup. Terms change, so it checks the source before recommending any
 
 ## After every omp or plugin update
 
+From the pack's folder:
+
 ```sh
-uv run /path/to/omp-starter-pack/install.py --check --glitch /path/to/your/glitch
+uv run install.py --check --glitch ~/glitch
 ```
 
 It changes nothing. Every line should say `ok`. Updates are when things break quietly: a renamed

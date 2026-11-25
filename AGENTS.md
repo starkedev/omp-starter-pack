@@ -88,8 +88,9 @@ was set because they chose it. If any line under `Check` says `FAIL`, say which 
   settings change, so close the ones they do not need first.
 - Tell them about the provider guide: in omp, they say "set up my providers". It checks which
   of their plans the vendor allows in omp, signs them in, and gives the background helpers small
-  models. Say plainly that a Claude plan is not allowed in omp; for Claude they use Claude Code
-  in their Glitch folder, or an Anthropic API key in omp.
+  models. Say plainly that Anthropic permits plan sign-ins only in Claude Code and apps it has
+  approved, and omp isn't one; for Claude they use Claude Code in their Glitch folder, or an
+  Anthropic API key in omp.
 - Tell them to run `uv run install.py --check --glitch <Glitch folder>` after every omp or
   plugin update.
 - Tell them the three things from "Things to know" in `README.md` that matter day to day:

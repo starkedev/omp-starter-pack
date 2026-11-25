@@ -74,9 +74,9 @@ anywhere. As of 25 November 2026:
 - **Fine:** any API key, a Mistral plan (its sign-in creates an ordinary API key), and a ChatGPT
   plan (OpenAI welcomes open-source tools on its plans, though omp doesn't use OpenAI's approved
   sign-in yet).
-- **Not allowed:** Claude, Cursor, Grok and z.ai Coding Plan sign-ins in omp. Their terms limit
-  plans to their own or named tools, and omp isn't one; Cursor has said so about omp by name.
-  Anthropic, xAI and z.ai API keys are fine instead; Cursor has no API key for omp.
+- **Cursor:** Cursor staff say omp's Cursor sign-in breaks their terms, and named omp.
+- **Claude, Grok and z.ai Coding Plan:** only their own or listed tools are permitted, and omp
+  isn't one. Their API keys are fine instead.
 - **For Claude on your plan,** use Claude Code itself in your Glitch folder. It runs Glitch fully.
 
 The provider guide (`files/skills/omp-providers/SKILL.md`) has the sources for each and walks you
